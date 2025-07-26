@@ -12,6 +12,8 @@ import (
 
 	"NotesService/internal/middlewares"
 	notes "NotesService/internal/notesRepository"
+
+	"github.com/rs/zerolog"
 )
 
 var isShuttingDown atomic.Bool
@@ -20,7 +22,7 @@ func StartServer(ctx context.Context, port string, service *notes.NotesRepositor
 	onGoingCtx, cancelAll := context.WithCancel(ctx)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/notes", middlewares.LogMiddleware(httpCreateNoteHandler(service)))
-	mux.HandleFunc("/health", checkHealthHandler)
+	mux.HandleFunc("/health", middlewares.LogMiddleware(checkHealthHandler()))
 
 	server := &http.Server{
 		Addr:    ":" + port,
@@ -77,11 +79,23 @@ func httpCreateNoteHandler(service *notes.NotesRepositoryImpl) middlewares.Handl
 
 }
 
-func checkHealthHandler(w http.ResponseWriter, r *http.Request) {
-	if isShuttingDown.Load() {
-		http.Error(w, "Shutting down", http.StatusServiceUnavailable)
-		return
+func checkHealthHandler() middlewares.HandlerFuncWithStatus {
+	return func(w http.ResponseWriter, r *http.Request) (middlewares.APIResponse, int, error) {
+		if isShuttingDown.Load() {
+			return middlewares.APIResponse{Error: "shutting down"},
+				http.StatusServiceUnavailable, errors.New("shutting down")
+		}
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte("ok"))
+		if err != nil {
+			http.Error(w, "failed to respond", http.StatusServiceUnavailable)
+			logger := r.Context().Value(middlewares.LoggerCtxKey).(zerolog.Logger)
+			logger.Warn().Err(err).Msg("failed to write response")
+			return middlewares.APIResponse{}, 0, err
+		}
+		resp := struct {
+			Health bool `json:"health"`
+		}{Health: true}
+		return middlewares.APIResponse{Data: resp}, http.StatusOK, nil
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
 }

@@ -9,13 +9,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const (
-	LoggerCtxKey = iota
-)
+type ctxLoggerKey struct{}
+
+var LoggerCtxKey = ctxLoggerKey{}
 
 type APIResponse struct {
-	Data  interface{} `json:"data,omitempty"`
-	Error string      `json:",omitempty"`
+	Data  any    `json:"data,omitempty"`
+	Error string `json:",omitempty"`
 }
 
 type HandlerFuncWithStatus func(writer http.ResponseWriter, request *http.Request) (APIResponse, int, error)
@@ -36,7 +36,8 @@ func LogMiddleware(next HandlerFuncWithStatus) http.HandlerFunc {
 		ctx := context.WithValue(r.Context(), LoggerCtxKey, subLogger)
 		data, statusCode, err := next(w, r.WithContext(ctx))
 		if err != nil {
-			http.Error(w, err.Error(), statusCode)
+			_ = json.NewEncoder(w).Encode(data.Data)
+			w.WriteHeader(statusCode)
 			return
 		}
 
