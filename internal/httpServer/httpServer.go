@@ -1,16 +1,16 @@
 package httpserver
 
 import (
+	"NotesService/internal/middlewares"
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"sync/atomic"
 	"time"
 
-	"NotesService/internal/middlewares"
 	notes "NotesService/internal/notesRepository"
 
 	"github.com/rs/zerolog"
@@ -18,7 +18,7 @@ import (
 
 var isShuttingDown atomic.Bool
 
-func StartServer(ctx context.Context, port string, service *notes.NotesRepositoryImpl) {
+func StartServer(ctx context.Context, port string, service *notes.RepositoryImpl) {
 	onGoingCtx, cancelAll := context.WithCancel(ctx)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/notes", middlewares.LogMiddleware(httpCreateNoteHandler(service)))
@@ -27,14 +27,14 @@ func StartServer(ctx context.Context, port string, service *notes.NotesRepositor
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
-		BaseContext: func(l net.Listener) context.Context {
+		BaseContext: func(_ net.Listener) context.Context {
 			return onGoingCtx
 		},
 	}
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("ListenAndServe error: %v", err)
+			log.Printf("ListenAndServe error: %v", err)
 		}
 	}()
 
@@ -44,30 +44,34 @@ func StartServer(ctx context.Context, port string, service *notes.NotesRepositor
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("shutdown error:%v", err)
+		log.Printf("shutdown error:%v", err)
 	}
 	cancelAll()
-
 }
 
-func httpCreateNoteHandler(service *notes.NotesRepositoryImpl) middlewares.HandlerFuncWithStatus {
+func httpCreateNoteHandler(service *notes.RepositoryImpl) middlewares.HandlerFuncWithStatus {
 	return func(w http.ResponseWriter, r *http.Request) (middlewares.APIResponse, int, error) {
 		if r.Method != http.MethodPost {
 			return middlewares.APIResponse{Error: "method is now allowed"},
-				http.StatusMethodNotAllowed, errors.New("method is now allowed")
+				http.StatusMethodNotAllowed, fmt.Errorf("httpServer.httpCreateNoteHandler:method is now allowed")
 		}
 		ctx := r.Context()
 
 		var note notes.Note
 		if err := json.NewDecoder(r.Body).Decode(&note); err != nil {
 			return middlewares.APIResponse{Error: "invalid json"},
-				http.StatusBadRequest, errors.New("invalid json")
+				http.StatusBadRequest, fmt.Errorf("httpCreateNoteHandler:%w", err)
 		}
 
-		id, err := service.Create(ctx, note.AccountId, note.Title, note.Title)
+		if err := notes.JsonValidator(note); err != nil {
+			return middlewares.APIResponse{Error: err.Error()},
+				http.StatusBadRequest, fmt.Errorf("httpCreateNoteHandler:%w", err)
+		}
+
+		id, err := service.Create(ctx, note.AccountID, note.Title, note.Title)
 		if err != nil {
 			return middlewares.APIResponse{Error: "service error"},
-				http.StatusInternalServerError, errors.New("service error")
+				http.StatusInternalServerError, fmt.Errorf("httpCreateNoteHandler:%w", err)
 		}
 
 		resp := struct {
@@ -76,22 +80,19 @@ func httpCreateNoteHandler(service *notes.NotesRepositoryImpl) middlewares.Handl
 
 		return middlewares.APIResponse{Data: resp}, http.StatusCreated, nil
 	}
-
 }
 
 func checkHealthHandler() middlewares.HandlerFuncWithStatus {
 	return func(w http.ResponseWriter, r *http.Request) (middlewares.APIResponse, int, error) {
 		if isShuttingDown.Load() {
 			return middlewares.APIResponse{Error: "shutting down"},
-				http.StatusServiceUnavailable, errors.New("shutting down")
+				http.StatusServiceUnavailable, fmt.Errorf("httpServer.checkHealthHandler:shutting down")
 		}
-		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte("ok"))
 		if err != nil {
-			http.Error(w, "failed to respond", http.StatusServiceUnavailable)
 			logger := r.Context().Value(middlewares.LoggerCtxKey).(zerolog.Logger)
 			logger.Warn().Err(err).Msg("failed to write response")
-			return middlewares.APIResponse{}, 0, err
+			return middlewares.APIResponse{}, 0, fmt.Errorf("checkHealthHandler:%w", err)
 		}
 		resp := struct {
 			Health bool `json:"health"`

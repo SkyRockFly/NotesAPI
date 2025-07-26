@@ -1,6 +1,7 @@
 package main
 
 import (
+	"NotesService/internal/db"
 	"context"
 	"fmt"
 	"log"
@@ -8,7 +9,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"NotesService/internal/db"
 	httpserver "NotesService/internal/httpServer"
 	notes "NotesService/internal/notesRepository"
 
@@ -21,18 +21,20 @@ func main() {
 	defer stop()
 
 	if err := godotenv.Load("configs/app.env"); err != nil {
+		stop()
 		log.Fatalf("Failed to load env file:%v", err)
 	}
-	dbUrl := os.Getenv("DB_URL")
+	DBUrl := os.Getenv("DB_URL")
 
-	pool, err := db.InitDB(ctx, dbUrl)
+	pool, err := db.InitDB(ctx, DBUrl)
 	if err != nil {
+		stop()
 		log.Fatalf("Failed to connect to DB:%v", err)
 	}
 
 	repo := notes.PostgresNewRepository(pool)
 
-	service := notes.NotesNewRepositoryImpl(repo)
+	service := notes.NewRepositoryImpl(repo)
 	serverPort := os.Getenv("PORT")
 
 	httpserver.StartServer(ctx, serverPort, service)

@@ -9,8 +9,8 @@ import (
 )
 
 type Note struct {
-	Id        int        `json:"id" db:"id"`
-	AccountId int        `json:"account_id" db:"account_id"`
+	ID        int        `json:"id" db:"id"`
+	AccountID int        `json:"account_id" db:"account_id"`
 	Title     string     `json:"title" db:"title"`
 	Body      string     `json:"body" db:"body"`
 	CreatedAt time.Time  `json:"created_at" db:"created_at"`
@@ -24,40 +24,59 @@ type UpdateNote struct {
 	body  *string `json:"body" db:"body"`
 }
 
-type NotesRepository interface {
-	Create(ctx context.Context, account_id int, title string, body string) (int, error)
+type Repository interface {
+	Create(ctx context.Context, accountID int, title string, body string) (int, error)
 	Delete(id int) error
 	Get(id int) (Note, error)
-	List(account_id int) ([]Note, error)
+	List(accountID int) ([]Note, error)
 	Update(newNote UpdateNote) (int, error)
 }
 
-type NotesRepositoryImpl struct {
-	repo NotesRepository
+type RepositoryImpl struct {
+	repo Repository
 }
 
-func NotesNewRepositoryImpl(repo NotesRepository) *NotesRepositoryImpl {
-	return &NotesRepositoryImpl{repo: repo}
+func NewRepositoryImpl(repo Repository) *RepositoryImpl {
+	return &RepositoryImpl{repo: repo}
 }
 
-func (s *NotesRepositoryImpl) Create(ctx context.Context, account_id int, title string, body string) (int, error) {
-	return s.repo.Create(ctx, account_id, title, body)
+func (s *RepositoryImpl) Create(ctx context.Context, accountID int, title string, body string) (int, error) {
+	id, err := s.repo.Create(ctx, accountID, title, body)
+	if err != nil {
+		return -1, fmt.Errorf("notesService.Create: %w", err)
+	}
+	return id, nil
 }
 
-func (s *NotesRepositoryImpl) Delete(id int) error {
-	return s.repo.Delete(id)
+func (s *RepositoryImpl) Delete(id int) error {
+	if err := s.repo.Delete(id); err != nil {
+		return fmt.Errorf("notesService.Delete:%w", err)
+	}
+	return nil
 }
 
-func (s *NotesRepositoryImpl) Get(id int) (Note, error) {
-	return s.repo.Get(id)
+func (s *RepositoryImpl) Get(id int) (Note, error) {
+	note, err := s.repo.Get(id)
+	if err != nil {
+		return Note{}, fmt.Errorf("notesService.Get:%w", err)
+	}
+	return note, nil
 }
 
-func (s *NotesRepositoryImpl) List(account_id int) ([]Note, error) {
-	return s.repo.List(account_id)
+func (s *RepositoryImpl) List(accountID int) ([]Note, error) {
+	notes, err := s.repo.List(accountID)
+	if err != nil {
+		return []Note{}, fmt.Errorf("notesService.List:%w", err)
+	}
+	return notes, nil
 }
 
-func (s *NotesRepositoryImpl) Update(newNote UpdateNote) (int, error) {
-	return s.repo.Update(newNote)
+func (s *RepositoryImpl) Update(newNote UpdateNote) (int, error) {
+	id, err := s.repo.Update(newNote)
+	if err != nil {
+		return -1, fmt.Errorf("notesService.Update:%w", err)
+	}
+	return id, nil
 }
 
 type PostgresNotesImpl struct{ postgresDB *pgxpool.Pool }
@@ -66,11 +85,11 @@ func PostgresNewRepository(postgresDB *pgxpool.Pool) *PostgresNotesImpl {
 	return &PostgresNotesImpl{postgresDB: postgresDB}
 }
 
-func (s *PostgresNotesImpl) Create(ctx context.Context, account_id int, title string, body string) (int, error) {
+func (s *PostgresNotesImpl) Create(ctx context.Context, accountID int, title string, body string) (int, error) {
 	sql := `INSERT INTO note (account_id, title, body)
 			VALUES ($1, $2, $3)
 			RETURNING id`
-	row := s.postgresDB.QueryRow(ctx, sql, account_id, title, body)
+	row := s.postgresDB.QueryRow(ctx, sql, accountID, title, body)
 	var id int
 	err := row.Scan(&id)
 	if err != nil {
@@ -88,10 +107,22 @@ func (s *PostgresNotesImpl) Get(id int) (Note, error) {
 	panic("get not implemented yet")
 }
 
-func (s *PostgresNotesImpl) List(account_id int) ([]Note, error) {
+func (s *PostgresNotesImpl) List(accountID int) ([]Note, error) {
 	panic("list not implemented yet")
 }
 
 func (s *PostgresNotesImpl) Update(newNote UpdateNote) (int, error) {
 	panic("update not implemented yet")
+}
+
+func JsonValidator(note Note) error {
+	if note.Title == "" {
+		return fmt.Errorf("no title in json")
+	}
+
+	if note.AccountID == 0 {
+		return fmt.Errorf("no accountID in json")
+	}
+
+	return nil
 }

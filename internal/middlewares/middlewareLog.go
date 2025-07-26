@@ -36,8 +36,8 @@ func LogMiddleware(next HandlerFuncWithStatus) http.HandlerFunc {
 		ctx := context.WithValue(r.Context(), LoggerCtxKey, subLogger)
 		data, statusCode, err := next(w, r.WithContext(ctx))
 		if err != nil {
-			_ = json.NewEncoder(w).Encode(data.Data)
-			w.WriteHeader(statusCode)
+			_ = json.NewEncoder(w).Encode(data.Error)
+			subLogger.Err(err).Msg("failed to execute handler")
 			return
 		}
 
