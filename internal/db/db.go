@@ -9,31 +9,30 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const (
+	defaultDBConnTimeout    = 20 * time.Second
+	defaultPingRetryTimeout = 3 * time.Second
+)
+
 func InitDB(ctx context.Context, url string) (*pgxpool.Pool, error) {
-	childCtx, cancel := context.WithTimeout(ctx, time.Second*20)
+	childCtx, cancel := context.WithTimeout(ctx, defaultDBConnTimeout)
 	defer cancel()
+
 	pgxpool, err := pgxpool.New(childCtx, url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to establish pgxpool connection:%w", err)
+		return nil, fmt.Errorf("establish pgxpool connection: %w", err)
 	}
 
-	err = pgxpool.Ping(childCtx)
-	if err != nil {
-		log.Printf("Cannot ping database, retrying for 9 seconds")
-		for i := 0; i < 3; i++ {
-			err = pgxpool.Ping(childCtx)
-			if err == nil {
-				break
-			}
-			time.Sleep(3 * time.Second)
+	tryNum := 0
+	for err := pgxpool.Ping(childCtx); err != nil; tryNum++ {
+		if tryNum == 3 {
+			return nil, fmt.Errorf("ping database: %w", err)
 		}
-		if err := pgxpool.Ping(childCtx); err != nil {
-			return nil, fmt.Errorf("failed to ping database:%w", err)
-		}
-
+		time.Sleep(defaultPingRetryTimeout)
+		log.Printf("Ping database, try %d. Retry after %s", tryNum+1, defaultDBConnTimeout)
 	}
 
-	fmt.Println("Successfully established connection")
+	log.Printf("Successfully established connection")
 
 	return pgxpool, nil
 }

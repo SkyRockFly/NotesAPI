@@ -2,7 +2,6 @@ package middlewares
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -13,19 +12,32 @@ type ctxLoggerKey struct{}
 
 var LoggerCtxKey = ctxLoggerKey{}
 
-type APIResponse struct {
-	Data  any    `json:"data,omitempty"`
-	Error string `json:",omitempty"`
+type middlewareResponseWriter struct {
+	w          http.ResponseWriter
+	statusCode int
 }
 
-type HandlerFuncWithStatus func(writer http.ResponseWriter, request *http.Request) (APIResponse, int, error)
+func (r *middlewareResponseWriter) Header() http.Header {
+	return r.w.Header()
+}
 
-func LogMiddleware(next HandlerFuncWithStatus) http.HandlerFunc {
+func (r *middlewareResponseWriter) Write(w []byte) (int, error) {
+	return r.w.Write(w)
+}
+
+func (r *middlewareResponseWriter) WriteHeader(statusCode int) {
+	r.statusCode = statusCode
+	r.w.WriteHeader(statusCode)
+}
+
+func LogMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestID := r.Header.Get("x-request-id")
 		if requestID == "" {
 			requestID = uuid.New().String()
 		}
+
+		sw := &middlewareResponseWriter{w: w, statusCode: -1}
 
 		subLogger := log.With().Str("requestID", requestID).Logger()
 
@@ -34,18 +46,7 @@ func LogMiddleware(next HandlerFuncWithStatus) http.HandlerFunc {
 			Str("method", r.Method).Msg("in")
 
 		ctx := context.WithValue(r.Context(), LoggerCtxKey, subLogger)
-		data, statusCode, err := next(w, r.WithContext(ctx))
-		if err != nil {
-			_ = json.NewEncoder(w).Encode(data.Error)
-			subLogger.Err(err).Msg("failed to execute handler")
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(data.Data)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		subLogger.Info().Int("status", statusCode).Msg("out")
+		next(sw, r.WithContext(ctx))
+		subLogger.Info().Int("status", sw.statusCode).Msg("out")
 	}
 }

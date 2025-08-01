@@ -1,43 +1,34 @@
 package main
 
 import (
+	appConfig "NotesService/configs"
 	"NotesService/internal/db"
+	noterepository "NotesService/internal/noteRepository"
+	noteservice "NotesService/internal/noteService"
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"os/signal"
 	"syscall"
 
 	httpserver "NotesService/internal/httpServer"
-	notes "NotesService/internal/notesRepository"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	var err error
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	if err := godotenv.Load("configs/app.env"); err != nil {
-		stop()
-		log.Fatalf("Failed to load env file:%v", err)
-	}
-	DBUrl := os.Getenv("DB_URL")
+	appConfig := appConfig.GetAppConfig()
 
-	pool, err := db.InitDB(ctx, DBUrl)
+	pool, err := db.InitDB(ctx, appConfig.DB.URL)
 	if err != nil {
-		stop()
-		log.Fatalf("Failed to connect to DB:%v", err)
+		panic(fmt.Sprintf("Failed to connect to DB:%v", err))
 	}
+	defer pool.Close()
 
-	repo := notes.PostgresNewRepository(pool)
+	repo := noterepository.NewPostgres(pool)
+	service := noteservice.NewService(repo)
 
-	service := notes.NewRepositoryImpl(repo)
-	serverPort := os.Getenv("PORT")
-
-	httpserver.StartServer(ctx, serverPort, service)
+	httpserver.StartServer(ctx, appConfig.Server.Port, service)
 	fmt.Println("Server")
 	<-ctx.Done()
 	fmt.Println("bye,bye, медведи")
