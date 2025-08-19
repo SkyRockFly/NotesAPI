@@ -1,0 +1,10 @@
+db:
+    url: "postgres://postgres:bear@db:5432/notedb"
+    image: "postgres:16-alpine"
+    name: "notedb_test"
+    user: "postgres"
+    password: "bear"
+    driver: "postgres"
+    port: "5432/tcp"
+    args: 
+        sslmode: disable

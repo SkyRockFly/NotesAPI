@@ -1,0 +1,40 @@
+# testdata/fixtures/note.yml
+- id: 1
+  account_id: 101
+  title: "Первый след когтей"
+  body: "Бруня оставил заметку прямо на дверце — когтями. Данные для теста GET."
+  created_at: "2025-08-12T08:00:00Z"
+  updated_at: "2025-08-12T08:15:00Z"
+  deleted_at: null
+
+- id: 2
+  account_id: 101
+  title: "Мёд и сталь"
+  body: "Заметка про то, как он обмакнул лапу в мёд и пошёл ковыряться в коде."
+  created_at: "2025-08-12T09:30:00Z"
+  updated_at: "2025-08-12T09:45:00Z"
+  deleted_at: null
+
+- id: 3
+  account_id: 202
+  title: "Тест на обновление"
+  body: "Эту заметку мы будем менять в тесте PUT — проверка, что всё сохраняется."
+  created_at: "2025-08-12T10:15:00Z"
+  updated_at: "2025-08-12T10:15:00Z"
+  deleted_at: null
+
+- id: 4
+  account_id: 202
+  title: "Патчевый медведь"
+  body: "Для PATCH — половина данных, остальное оставим нетронутым."
+  created_at: "2025-08-12T11:45:00Z"
+  updated_at: "2025-08-12T12:00:00Z"
+  deleted_at: null
+
+- id: 5
+  account_id: 303
+  title: "DELETE меня, если сможешь"
+  body: "Тест на удаление: хэндлер должен убрать этот след из базы (soft delete)."
+  created_at: "2025-08-12T12:00:00Z"
+  updated_at: "2025-08-12T12:15:00Z"
+  deleted_at: null # уже помечена как удалённая
