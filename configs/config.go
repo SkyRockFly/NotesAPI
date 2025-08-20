@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Server server `yaml:"server"`
 	DB     db     `yaml:"db"`
+	Log    logger `yaml:"logger"`
 }
 
 type server struct {
@@ -19,6 +20,12 @@ type server struct {
 
 type db struct {
 	URL string `yaml:"url"`
+}
+
+type logger struct {
+	Timestamp   string `yaml:"timestamp"`
+	FormatLevel string `yaml:"formatlevel"`
+	Level       string `yaml:"level"`
 }
 
 func GetAppConfig() (*Config, error) {

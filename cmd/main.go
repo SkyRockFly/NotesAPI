@@ -23,7 +23,7 @@ func main() {
 		panic(fmt.Errorf("failed to connect to DB: %w", err))
 	}
 
-	applogger.Configure()
+	applogger.Configure(appConfig)
 
 	pool, err := db.InitDB(ctx, appConfig.DB.URL)
 	if err != nil {

@@ -383,7 +383,7 @@ func TestHttpGetNoteHandler(t *testing.T) {
 				}
 				return
 			}
-			t.Logf("body: %q", rr.Body.String())
+
 			var got fixtureNote
 			require.NoError(t, json.NewDecoder(rr.Body).Decode(&got))
 			compareNotes(t, testNote, got)
