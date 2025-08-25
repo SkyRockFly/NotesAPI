@@ -1,7 +1,7 @@
 package main
 
 import (
-	appConfig "NotesService/configs"
+	appConfig "NotesService/config"
 	"NotesService/internal/db"
 	applogger "NotesService/internal/logger"
 	noterepository "NotesService/internal/noteRepository"
@@ -12,22 +12,28 @@ import (
 	"syscall"
 
 	httpserver "NotesService/internal/httpServer"
+
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	defer stop() //zerolog до init'a (default logger)
 
 	appConfig, err := appConfig.GetAppConfig()
 	if err != nil {
-		panic(fmt.Errorf("failed to connect to DB: %w", err))
+		log.Panic().Err(fmt.Errorf("load config: %w", err)).Msg("start app")
 	}
 
-	applogger.Configure(appConfig)
+	applogger.Configure(applogger.LoggerCfg{
+		FormatTimestamp: appConfig.Log.Timestamp,
+		FormatLevel:     appConfig.Log.FormatLevel,
+		Loglvl:          appConfig.Log.Level,
+	})
 
 	pool, err := db.InitDB(ctx, appConfig.DB.URL)
 	if err != nil {
-		panic(fmt.Errorf("initDB: %w", err))
+		log.Panic().Err(fmt.Errorf("initDB: %w", err)).Msg("start app")
 	}
 	defer pool.Close()
 
@@ -35,6 +41,4 @@ func main() {
 	service := noteservice.NewService(repo)
 
 	httpserver.StartServer(ctx, appConfig.Server.Port, service)
-	<-ctx.Done()
-	stop()
 }

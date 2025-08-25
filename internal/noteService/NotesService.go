@@ -13,16 +13,16 @@ var (
 	ErrInvalid = errors.New("invalid") // 400
 )
 
-type Repository interface {
+type IRepository interface {
 	Create(ctx context.Context, accountID int, title string, body string) (int, error)
-	Delete(ctx context.Context, id int) error
-	Get(ctx context.Context, id int) (*noterepository.Note, error)
-	List(accountID int) ([]noterepository.Note, error)
-	Update(ctx context.Context, id int, title string, body string) error
+	Delete(ctx context.Context, id, accountID int) error
+	Get(ctx context.Context, id, accountID int) (noterepository.Note, error)
+	List(ctx context.Context, accountID int) ([]noterepository.Note, error)
+	Update(ctx context.Context, title, body string, id, accountID int) error
 }
 
 type Service struct {
-	repo *noterepository.PostgresImpl
+	repo IRepository
 }
 
 type Note struct {
@@ -32,10 +32,13 @@ type Note struct {
 	Body      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	DeletedAt *time.Time
+	DeletedAt time.Time
 }
 
-func (n *Note) CreateValidator() error {
+//t, _ := time.Parse(time.DateTime, "")
+//	t.IsZero()
+
+func (n *Note) CreateValidator() error { //без методов Note
 	if n.AccountID < 1 {
 		return fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
 	}
@@ -48,7 +51,7 @@ func (n *Note) CreateValidator() error {
 	return nil
 }
 
-func (n *Note) DeleteValidator() error {
+func (n *Note) DeleteValidator() error { //Validate
 	if n.ID < 1 {
 		return fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
 	}
@@ -91,7 +94,7 @@ func (n *Note) ListValidator() error {
 	return nil
 }
 
-func NewService(repo *noterepository.PostgresImpl) *Service {
+func NewService(repo IRepository) *Service {
 	return &Service{repo: repo}
 }
 
@@ -118,17 +121,17 @@ func (s *Service) Delete(ctx context.Context, note *Note) error {
 	return nil
 }
 
-func (s *Service) Get(ctx context.Context, note *Note) (*Note, error) {
+func (s *Service) Get(ctx context.Context, note *Note) (Note, error) {
 	if err := note.GetValidator(); err != nil {
-		return nil, fmt.Errorf("validator: %w", err)
+		return Note{}, fmt.Errorf("validator: %w", err)
 	}
 
 	noteRepo, err := s.repo.Get(ctx, note.ID, note.AccountID)
 	if err != nil {
-		return nil, fmt.Errorf("noteService.Get:%w", err)
+		return Note{}, fmt.Errorf("noteService.Get:%w", err)
 	}
 
-	noteServ := repoToServ(&noteRepo)
+	noteServ := repoToServ(noteRepo)
 	return noteServ, nil
 }
 
@@ -144,8 +147,8 @@ func (s *Service) List(ctx context.Context, note *Note) ([]Note, error) {
 
 	servNotes := make([]Note, 0, len(notes))
 	for _, noteRepo := range notes {
-		note := repoToServ(&noteRepo)
-		servNotes = append(servNotes, *note)
+		note := repoToServ(noteRepo)
+		servNotes = append(servNotes, note)
 	}
 
 	return servNotes, nil
@@ -156,15 +159,14 @@ func (s *Service) Update(ctx context.Context, note *Note) error {
 		return fmt.Errorf("validator:%w", err)
 	}
 
-	err := s.repo.Update(ctx, note.Title, note.Body, note.ID, note.AccountID)
-	if err != nil {
+	if err := s.repo.Update(ctx, note.Title, note.Body, note.ID, note.AccountID); err != nil {
 		return fmt.Errorf("notesService.Update:%w", err)
 	}
 	return nil
 }
 
-func repoToServ(noteRepo *noterepository.Note) *Note {
-	note := &Note{
+func repoToServ(noteRepo noterepository.Note) Note {
+	note := Note{
 		ID:        noteRepo.ID,
 		AccountID: noteRepo.AccountID,
 		Title:     noteRepo.Title,

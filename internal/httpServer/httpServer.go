@@ -33,10 +33,6 @@ type healthResponse struct {
 	Health bool `json:"health"`
 }
 
-type CreateNoteResp struct {
-	ID int `json:"id"`
-}
-
 type DeleteNoteResp struct {
 	Deleted bool `json:"deleted"`
 }
@@ -77,7 +73,7 @@ func StartServer(ctx context.Context, port string, service *noteservice.Service)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
-			panic(fmt.Sprintf("ListenAndServe error: %v", err))
+			log.Panic().Err(fmt.Errorf("listenAndServe: %w", err)).Msg("httpserver.start server") //return error
 		}
 	}()
 
@@ -89,42 +85,6 @@ func StartServer(ctx context.Context, port string, service *noteservice.Service)
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Warn().Err(err).Msg("shutdown")
-	}
-}
-
-func HTTPCreateNoteHandler(service *noteservice.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Content-Type") != "application/json" {
-			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
-			return
-		}
-		ctx := r.Context()
-		logger := getCtxLogger(ctx)
-
-		noteDTO, err := parseJSON(w, r)
-		if err != nil {
-			logger.
-				Warn().
-				Str("parse", "invalid json")
-			writeJSON(w, http.StatusBadRequest,
-				logger, errorAPIResponse{Err: "invalid json"})
-			return
-		}
-
-		note := remapDTOtoServ(noteDTO)
-		id, err := service.Create(ctx, note)
-		if err != nil {
-			code, info := mapHTTPError(err)
-			logger.
-				Warn().
-				Err(err).
-				Msg("service error")
-			writeJSON(w, code,
-				logger, info)
-			return
-		}
-		writeJSON(w, http.StatusCreated,
-			logger, CreateNoteResp{ID: id})
 	}
 }
 
