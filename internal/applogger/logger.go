@@ -19,10 +19,10 @@ type LoggerCfg struct {
 func init() {
 	output := zerolog.ConsoleWriter{
 		Out: os.Stdout,
-		FormatTimestamp: func(i interface{}) string {
+		FormatTimestamp: func(any) string {
 			return time.DateTime
 		},
-		FormatLevel: func(i interface{}) string {
+		FormatLevel: func(i any) string {
 			return strings.ToUpper(fmt.Sprintf("%-6s", i))
 		},
 	}
@@ -33,14 +33,11 @@ func init() {
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 }
 
-func Configure(cfg LoggerCfg) { //при подключении пакета?
+func Configure(cfg LoggerCfg) {
 	output := zerolog.ConsoleWriter{
-		Out: os.Stdout,
-		FormatTimestamp: func(i interface{}) string {
-			parse, _ := time.Parse(time.RFC3339, i.(string))
-			return parse.Format(cfg.FormatTimestamp)
-		},
-		FormatLevel: func(i interface{}) string {
+		Out:        os.Stdout,
+		TimeFormat: cfg.FormatTimestamp,
+		FormatLevel: func(i any) string {
 			return strings.ToUpper(fmt.Sprintf(cfg.FormatLevel, i))
 		},
 	}

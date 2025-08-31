@@ -5,11 +5,11 @@ import (
 	"net/http"
 )
 
-type CreateNoteResp struct {
-	ID int `json:"id"`
+type UpdateNoteResp struct {
+	Updated bool `json:"updated"`
 }
 
-func HTTPCreateNoteHandler(service *noteservice.Service) http.HandlerFunc {
+func HTTPUpdateNoteHandler(service *noteservice.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Content-Type") != "application/json" {
 			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
@@ -29,8 +29,7 @@ func HTTPCreateNoteHandler(service *noteservice.Service) http.HandlerFunc {
 		}
 
 		note := remapDTOtoSVC(noteDTO)
-		id, err := service.Create(ctx, note)
-		if err != nil {
+		if err := service.Update(ctx, note); err != nil {
 			code, info := mapHTTPError(err)
 			logger.
 				Warn().
@@ -40,7 +39,8 @@ func HTTPCreateNoteHandler(service *noteservice.Service) http.HandlerFunc {
 				logger, info)
 			return
 		}
-		writeJSON(w, http.StatusCreated,
-			logger, CreateNoteResp{ID: id})
+
+		writeJSON(w, http.StatusOK,
+			logger, UpdateNoteResp{Updated: true})
 	}
 }

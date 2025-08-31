@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"NotesService/internal/testutil"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,11 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const fixturePath = "./testdata/fixtures/note.sql"
-
-func TestHTTPCreateNoteHandler(t *testing.T) {
+func TestHTTPDeleteNoteHandler(t *testing.T) {
 	require.NoError(t, testutil.LoadFixtures(pool, fixturePath))
-	sut := HTTPCreateNoteHandler(svc)
+	sut := HTTPDeleteNoteHandler(svc)
 
 	type wantReq struct {
 		body   string
@@ -50,7 +47,7 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
-				body: `{"error":"invalid json"}` + "\n",
+				body: `{"error":"invalid json"}`,
 			},
 		},
 		{
@@ -61,7 +58,7 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
-				body: `{"error":"invalid json"}` + "\n",
+				body: `{"error":"invalid json"}`,
 			},
 		},
 		{
@@ -72,28 +69,40 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
-				body: `{"error":"invalid content of fields"}` + "\n",
+				body: `{"error":"invalid content of fields"}`,
 			},
 		},
 		{
-			name: "Ok",
+			name: "Delete existing note",
 			req: wantReq{
-				body:   `{"account_id":101,"title":"Honey","body":"Bears"}`,
+				body:   `{"account_id":303,"id":5}`,
 				header: map[string]string{"Content-Type": "application/json"},
 			},
 			want: wantResp{
-				code: http.StatusCreated,
-				body: "",
+				code: http.StatusOK,
+				body: `{"deleted":true}`,
+			},
+		},
+		{
+			name: "Delete non-existing note",
+			req: wantReq{
+				body:   `{"account_id":101,"id":99999}`,
+				header: map[string]string{"Content-Type": "application/json"},
+			},
+			want: wantResp{
+				code: http.StatusNotFound,
+				body: `{"error":"note not found"}`,
 			},
 		},
 	}
+
 	type reqInfo struct {
 		url    string
 		method string
 	}
 	req := reqInfo{
-		url:    "/note/create",
-		method: http.MethodPost,
+		url:    "/note/delete",
+		method: http.MethodDelete,
 	}
 
 	for _, tt := range tests {
@@ -107,15 +116,6 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 
 			sut.ServeHTTP(rr, req)
 			assert.Equal(t, tt.want.code, rr.Code, "status code")
-
-			if rr.Code >= 200 && rr.Code < 300 && tt.want.body == "" {
-				var resp struct {
-					ID int `json:"id"`
-				}
-				require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
-				require.Greater(t, resp.ID, 0)
-				return
-			}
 
 			want, ok := tt.want.body.(string)
 			require.True(t, ok, "assert string wantBody")

@@ -1,9 +1,9 @@
 package main
 
 import (
-	appConfig "NotesService/config"
+	"NotesService/internal/applogger"
+	"NotesService/internal/config"
 	"NotesService/internal/db"
-	applogger "NotesService/internal/logger"
 	noterepository "NotesService/internal/noteRepository"
 	noteservice "NotesService/internal/noteService"
 	"context"
@@ -18,9 +18,8 @@ import (
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop() //zerolog до init'a (default logger)
-
-	appConfig, err := appConfig.GetAppConfig()
+	defer stop()
+	appConfig, err := config.GetAppConfig()
 	if err != nil {
 		log.Panic().Err(fmt.Errorf("load config: %w", err)).Msg("start app")
 	}
@@ -40,5 +39,8 @@ func main() {
 	repo := noterepository.NewPostgres(pool)
 	service := noteservice.NewService(repo)
 
-	httpserver.StartServer(ctx, appConfig.Server.Port, service)
+	if err := httpserver.StartServer(ctx, appConfig.Server.Port, service); err != nil {
+		log.Panic().Err(fmt.Errorf("server: %w", err)).Msg("start app")
+	}
+	log.Info().Msg("server stopped gracefully")
 }

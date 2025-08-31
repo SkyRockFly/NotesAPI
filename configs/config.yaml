@@ -3,6 +3,6 @@ server:
 db:
   url: "postgres://postgres:bear@db:5432/notedb"
 logger:
-  timestamp: "2025-01-02 15:04:05"
+  timestamp: "2006-01-02 15:04:05"
   formatlevel: "%-6s"
   level: "debug"

@@ -16,10 +16,10 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
-	maxBodySize = 10 << 20
 	encodeError = `{"error":"encode failed"}`
 )
 
@@ -31,14 +31,6 @@ type errorAPIResponse struct {
 
 type healthResponse struct {
 	Health bool `json:"health"`
-}
-
-type DeleteNoteResp struct {
-	Deleted bool `json:"deleted"`
-}
-
-type UpdateNoteResp struct {
-	Updated bool `json:"updated"`
 }
 
 type DTO struct {
@@ -57,181 +49,69 @@ type NoteResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func StartServer(ctx context.Context, port string, service *noteservice.Service) {
+func StartServer(ctx context.Context, port string, service *noteservice.Service) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /note/create", middlewares.LogMiddleware(HTTPCreateNoteHandler(service)))
-	mux.HandleFunc("DELETE /note/delete", middlewares.LogMiddleware(HTTPDeleteNoteHandler(service)))
-	mux.HandleFunc("PUT /note/update", middlewares.LogMiddleware(HTTPUpdateNoteHandler(service)))
-	mux.HandleFunc("GET /note/get", middlewares.LogMiddleware(HTTPGetNoteHandler(service)))
-	mux.HandleFunc("/health", middlewares.LogMiddleware(HealthCheckHandler()))
-	mux.HandleFunc("GET /notes/get", middlewares.LogMiddleware(HTTPListNoteHandler(service)))
+	mux.HandleFunc("POST /note/create",
+		middlewares.LogMiddleware(
+			middlewares.JSONFileSizeMiddleware(
+				HTTPCreateNoteHandler(service))))
+
+	mux.HandleFunc("DELETE /note/delete",
+		middlewares.LogMiddleware(
+			middlewares.JSONFileSizeMiddleware(
+				HTTPDeleteNoteHandler(service))))
+
+	mux.HandleFunc("PUT /note/update",
+		middlewares.LogMiddleware(
+			middlewares.JSONFileSizeMiddleware(
+				HTTPUpdateNoteHandler(service))))
+
+	mux.HandleFunc("GET /note/get",
+		middlewares.LogMiddleware(
+			middlewares.JSONFileSizeMiddleware(
+				HTTPGetNoteHandler(service))))
+
+	mux.HandleFunc("GET /notes/get",
+		middlewares.LogMiddleware(
+			middlewares.JSONFileSizeMiddleware(
+				HTTPListNoteHandler(service))))
+
+	mux.HandleFunc("/health",
+		middlewares.LogMiddleware(
+			HealthCheckHandler()))
 
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
 	}
 
-	go func() {
-		if err := server.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
-			log.Panic().Err(fmt.Errorf("listenAndServe: %w", err)).Msg("httpserver.start server") //return error
+	errs, eCtx := errgroup.WithContext(ctx)
+	errs.Go(func() error {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("listenAndServe: %w", err)
 		}
-	}()
+		return nil
+	})
 
-	<-ctx.Done()
+	<-eCtx.Done()
 	isShuttingDown.Store(true)
 
 	shutdownCtx, done := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer done()
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Warn().Err(err).Msg("shutdown")
+	if err := server.Shutdown(shutdownCtx); err != nil &&
+		!errors.Is(err, http.ErrServerClosed) &&
+		!errors.Is(err, context.Canceled) {
+		if errors.Is(err, context.DeadlineExceeded) {
+			_ = server.Close()
+		}
+		log.Warn().Err(err).Msg("graceful shutdown")
 	}
-}
 
-func HTTPDeleteNoteHandler(service *noteservice.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Content-Type") != "application/json" {
-			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
-			return
-		}
-		ctx := r.Context()
-		logger := getCtxLogger(ctx)
-
-		noteDTO, err := parseJSON(w, r)
-		if err != nil {
-			logger.
-				Warn().
-				Str("parse", "invalid json")
-			writeJSON(w, http.StatusBadRequest,
-				logger, errorAPIResponse{Err: "invalid json"})
-			return
-		}
-
-		note := remapDTOtoServ(noteDTO)
-		if err := service.Delete(ctx, note); err != nil {
-			code, info := mapHTTPError(err)
-			logger.
-				Warn().
-				Err(err).
-				Msg("service error")
-			writeJSON(w, code,
-				logger, info)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, logger, DeleteNoteResp{Deleted: true})
+	if err := errs.Wait(); err != nil {
+		return fmt.Errorf("server: %w", err)
 	}
-}
-
-func HTTPUpdateNoteHandler(service *noteservice.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Content-Type") != "application/json" {
-			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
-			return
-		}
-		ctx := r.Context()
-		logger := getCtxLogger(ctx)
-
-		noteDTO, err := parseJSON(w, r)
-		if err != nil {
-			logger.
-				Warn().
-				Str("parse", "invalid json")
-			writeJSON(w, http.StatusBadRequest,
-				logger, errorAPIResponse{Err: "invalid json"})
-			return
-		}
-
-		note := remapDTOtoServ(noteDTO)
-		if err := service.Update(ctx, note); err != nil {
-			code, info := mapHTTPError(err)
-			logger.
-				Warn().
-				Err(err).
-				Msg("service error")
-			writeJSON(w, code,
-				logger, info)
-			return
-		}
-
-		writeJSON(w, http.StatusOK,
-			logger, UpdateNoteResp{Updated: true})
-	}
-}
-
-func HTTPGetNoteHandler(service *noteservice.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Content-Type") != "application/json" {
-			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
-			return
-		}
-		ctx := r.Context()
-		logger := getCtxLogger(ctx)
-
-		noteDTO, err := parseJSON(w, r)
-		if err != nil {
-			logger.
-				Warn().
-				Str("parse", "invalid json")
-			writeJSON(w, http.StatusBadRequest,
-				logger, errorAPIResponse{Err: "invalid json"})
-			return
-		}
-		note := remapDTOtoServ(noteDTO)
-
-		servNote, err := service.Get(ctx, note)
-		if err != nil {
-			code, info := mapHTTPError(err)
-			logger.
-				Warn().
-				Err(err).
-				Msg("service error")
-			writeJSON(w, code,
-				logger, info)
-			return
-		}
-		newNote := remapServToResp(servNote)
-
-		writeJSON(w, http.StatusOK,
-			logger, newNote)
-	}
-}
-
-func HTTPListNoteHandler(service *noteservice.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Content-Type") != "application/json" {
-			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
-			return
-		}
-		ctx := r.Context()
-		logger := getCtxLogger(ctx)
-
-		noteDTO, err := parseJSON(w, r)
-		if err != nil {
-			logger.
-				Warn().
-				Str("parse", "invalid json")
-			writeJSON(w, http.StatusBadRequest,
-				logger, errorAPIResponse{Err: "invalid json"})
-			return
-		}
-		note := remapDTOtoServ(noteDTO)
-
-		notes, err := service.List(ctx, note)
-		if err != nil {
-			code, info := mapHTTPError(err)
-			logger.
-				Warn().
-				Err(err).
-				Msg("service error")
-			writeJSON(w, code,
-				logger, info)
-			return
-		}
-		respNotes := remapListToResp(notes)
-		writeJSON(w, http.StatusOK,
-			logger, respNotes)
-	}
+	return nil
 }
 
 func HealthCheckHandler() http.HandlerFunc {
@@ -273,8 +153,7 @@ func remapListToResp(notes []noteservice.Note) []NoteResponse {
 	return servNotes
 }
 
-func parseJSON(w http.ResponseWriter, r *http.Request) (DTO, error) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+func parseJSON(r *http.Request) (DTO, error) {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	var note DTO
@@ -312,8 +191,8 @@ func getCtxLogger(ctx context.Context) *zerolog.Logger {
 	return &logger
 }
 
-func remapDTOtoServ(noteDTO DTO) *noteservice.Note {
-	serviceNote := &noteservice.Note{
+func remapDTOtoSVC(noteDTO DTO) noteservice.Note {
+	serviceNote := noteservice.Note{
 		ID:        noteDTO.ID,
 		AccountID: noteDTO.AccountID,
 		Title:     noteDTO.Title,
@@ -322,8 +201,8 @@ func remapDTOtoServ(noteDTO DTO) *noteservice.Note {
 	return serviceNote
 }
 
-func remapServToResp(servNote *noteservice.Note) *NoteResponse {
-	respNote := &NoteResponse{
+func remapSVCToResp(servNote noteservice.Note) NoteResponse {
+	respNote := NoteResponse{
 		ID:        servNote.ID,
 		AccountID: servNote.AccountID,
 		Title:     servNote.Title,
@@ -337,7 +216,7 @@ func remapServToResp(servNote *noteservice.Note) *NoteResponse {
 func mapHTTPError(err error) (int, any) {
 	switch {
 	case errors.Is(err, noteservice.ErrInvalid):
-		return http.StatusBadRequest, errorAPIResponse{Err: "invalid json"}
+		return http.StatusBadRequest, errorAPIResponse{Err: "invalid content of fields"}
 	case errors.Is(err, noterepository.ErrNotFound):
 		return http.StatusNotFound, errorAPIResponse{Err: "note not found"}
 	default:

@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"NotesService/internal/testutil"
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,11 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const fixturePath = "./testdata/fixtures/note.sql"
-
-func TestHTTPCreateNoteHandler(t *testing.T) {
+func TestHTTPGetNoteHandler(t *testing.T) {
 	require.NoError(t, testutil.LoadFixtures(pool, fixturePath))
-	sut := HTTPCreateNoteHandler(svc)
+	sut := HTTPGetNoteHandler(svc)
 
 	type wantReq struct {
 		body   string
@@ -26,6 +25,8 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 		code int
 		body any
 	}
+	var buf bytes.Buffer
+	json.NewEncoder(&buf).Encode(&testNote)
 	tests := []struct {
 		name string
 		req  wantReq
@@ -76,14 +77,25 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "Ok",
+			name: "Get existing note",
 			req: wantReq{
-				body:   `{"account_id":101,"title":"Honey","body":"Bears"}`,
+				body:   `{"account_id":101,"id":1}`,
 				header: map[string]string{"Content-Type": "application/json"},
 			},
 			want: wantResp{
-				code: http.StatusCreated,
-				body: "",
+				code: http.StatusOK,
+				body: "noteTest",
+			},
+		},
+		{
+			name: "Get non-existing note",
+			req: wantReq{
+				body:   `{"account_id":101,"id":99999}`,
+				header: map[string]string{"Content-Type": "application/json"},
+			},
+			want: wantResp{
+				code: http.StatusNotFound,
+				body: `{"error":"note not found"}` + "\n",
 			},
 		},
 	}
@@ -92,8 +104,8 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 		method string
 	}
 	req := reqInfo{
-		url:    "/note/create",
-		method: http.MethodPost,
+		url:    "/note/get",
+		method: http.MethodGet,
 	}
 
 	for _, tt := range tests {
@@ -108,18 +120,17 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			sut.ServeHTTP(rr, req)
 			assert.Equal(t, tt.want.code, rr.Code, "status code")
 
-			if rr.Code >= 200 && rr.Code < 300 && tt.want.body == "" {
-				var resp struct {
-					ID int `json:"id"`
-				}
-				require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
-				require.Greater(t, resp.ID, 0)
+			if tt.want.body == "noteTest" {
+				var got FixtureNote
+				json.Unmarshal(rr.Body.Bytes(), &got)
+
+				assert.Equal(t, testNote, got)
 				return
 			}
 
-			want, ok := tt.want.body.(string)
-			require.True(t, ok, "assert string wantBody")
-			assert.Equal(t, normalizeJSON(t, want), normalizeJSON(t, rr.Body.String()))
+			str, ok := tt.want.body.(string)
+			require.True(t, ok, "string assert want body")
+			assert.Equal(t, normalizeJSON(t, str), normalizeJSON(t, rr.Body.String()))
 
 		})
 	}
