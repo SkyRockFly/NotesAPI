@@ -1,0 +1,9 @@
+server:
+  port: "5680"
+  base: "http://notes:5681/"
+db:
+  url: "postgres://postgres:bear@db:5433/notedb"
+logger:
+  timestamp: "2006-01-02 15:04:05"
+  formatlevel: "%-6s"
+  level: "debug"
