@@ -8,9 +8,7 @@ import (
 	"time"
 )
 
-var (
-	ErrInvalid = errors.New("invalid") //400
-)
+var ErrInvalid = errors.New("invalid") // 400
 
 type IRepository interface {
 	Get(ctx context.Context, id, accountID int) (usernoterepo.UserNote, error)
@@ -58,5 +56,4 @@ func (s *Service) Get(ctx context.Context, note Note) (Note, error) {
 	}
 
 	return svcNote, nil
-
 }

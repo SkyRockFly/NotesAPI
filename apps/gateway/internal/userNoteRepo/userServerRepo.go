@@ -14,8 +14,8 @@ import (
 
 var (
 	ErrNotFound   = errors.New("not found")   // 404
-	ErrBadRequest = errors.New("bad request") //400
-	ErrUpstream   = errors.New("upstream")    //500
+	ErrBadRequest = errors.New("bad request") // 400
+	ErrUpstream   = errors.New("upstream")    // 500
 )
 
 type httpRepo struct {
@@ -23,7 +23,7 @@ type httpRepo struct {
 	client *http.Client
 }
 
-func NewHttpRepo(base string) *httpRepo {
+func NewHTTPRepo(base string) *httpRepo {
 	return &httpRepo{
 		base:   base,
 		client: &http.Client{Timeout: 3 * time.Second},

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	usernoterepo "notes/apps/gateway/internal/userNoteRepo"
 	userservice "notes/apps/gateway/internal/userService"
-
 	"notes/pkg/middlewares"
 	"sync/atomic"
 	"time"

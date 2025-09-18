@@ -29,7 +29,7 @@ func main() {
 		Loglvl:          appConfig.Log.Level,
 	})
 
-	repo := usernoterepo.NewHttpRepo(appConfig.Server.Base)
+	repo := usernoterepo.NewHTTPRepo(appConfig.Server.Base)
 	service := userservice.NewService(repo)
 
 	log.Info().Msg("Setup successful")

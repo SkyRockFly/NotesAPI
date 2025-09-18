@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -130,7 +131,7 @@ func GetAppConfig() (*AppConfig, error) {
 	}
 
 	if err := v.Struct(config); err != nil {
-		if errs, ok := err.(validator.ValidationErrors); ok {
+		if errs, ok := errors.As(err,validator.ValidationErrors) err.(validator.ValidationErrors); ok {
 			var b strings.Builder
 			for _, e := range errs {
 				fmt.Fprintf(&b, "%s failed on '%s'\n", e.Namespace(), e.Tag())

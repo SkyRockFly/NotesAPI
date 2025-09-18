@@ -40,6 +40,5 @@ func getNoteHandler(service *userservice.Service) http.HandlerFunc {
 
 		respNote := remapSvcToRespNote(svcNote)
 		writeJSON(w, http.StatusOK, logger, respNote)
-
 	}
 }
