@@ -44,10 +44,30 @@ type ResponseNote struct {
 func StartServer(ctx context.Context, port string, service *userservice.Service) error {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /note/get",
+	mux.HandleFunc("POST /note/get",
 		middlewares.LogMiddleware(
 			middlewares.JSONFileSizeMiddleware(
 				getNoteHandler(service))))
+
+	mux.HandleFunc("DELETE /note/delete",
+		middlewares.LogMiddleware(
+			middlewares.JSONFileSizeMiddleware(
+				deleteNoteHandler(service))))
+
+	mux.HandleFunc("POST /notes",
+		middlewares.LogMiddleware(
+			middlewares.JSONFileSizeMiddleware(
+				listNoteHandler(service))))
+
+	mux.HandleFunc("PUT /note/update",
+		middlewares.LogMiddleware(
+			middlewares.JSONFileSizeMiddleware(
+				updateNoteHandler(service))))
+
+	mux.HandleFunc("POST /note/create",
+		middlewares.LogMiddleware(
+			middlewares.JSONFileSizeMiddleware(
+				createNoteHandler(service))))
 
 	server := &http.Server{
 		Addr:    ":" + port,

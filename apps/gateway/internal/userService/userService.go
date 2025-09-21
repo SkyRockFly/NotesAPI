@@ -12,6 +12,10 @@ var ErrInvalid = errors.New("invalid") // 400
 
 type IRepository interface {
 	Get(ctx context.Context, id, accountID int) (usernoterepo.UserNote, error)
+	Create(ctx context.Context, accountID int, title, body string) (usernoterepo.UserNote, error)
+	Update(ctx context.Context, id, accountID int, title, body string) (usernoterepo.UserNote, error)
+	List(ctx context.Context, accountID int) ([]usernoterepo.UserNote, error)
+	Delete(ctx context.Context, id, accountID int) (usernoterepo.UserNote, error)
 }
 
 type Service struct {

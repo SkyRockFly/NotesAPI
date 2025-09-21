@@ -66,12 +66,12 @@ func StartServer(ctx context.Context, port string, service *noteservice.Service)
 			middlewares.JSONFileSizeMiddleware(
 				HTTPUpdateNoteHandler(service))))
 
-	mux.HandleFunc("GET /note/get",
+	mux.HandleFunc("POST /note/get",
 		middlewares.LogMiddleware(
 			middlewares.JSONFileSizeMiddleware(
 				HTTPGetNoteHandler(service))))
 
-	mux.HandleFunc("GET /notes/get",
+	mux.HandleFunc("POST /notes/get",
 		middlewares.LogMiddleware(
 			middlewares.JSONFileSizeMiddleware(
 				HTTPListNoteHandler(service))))
