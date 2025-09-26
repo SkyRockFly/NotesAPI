@@ -20,7 +20,7 @@ services:
         db:
           condition: service_healthy
       volumes:
-        - ./apps/notes-svc/migrations:/migrations:ro
+        - ./migrations/notes-svc:/migrations:ro
       entrypoint: ["goose", "-dir", "/migrations", "up"]
       environment:
         GOOSE_DRIVER: postgres
@@ -30,7 +30,7 @@ services:
     notes:
       build: 
         context: .
-        dockerfile: apps/notes-svc/Dockerfile
+        dockerfile: cmd/notes-svc/Dockerfile
       image: notesapp
       depends_on:
         migrate:
@@ -38,7 +38,7 @@ services:
       ports:
         - "5681:5681"
       volumes:
-        - ./apps/notes-svc/configs/config.yaml:/app/configs/config.yaml:ro
+        -  ./config/notes-svc/config.yaml:/app/configs/config.yaml:ro
       healthcheck:
          test: ["CMD-SHELL", "wget -qO- --spider http://localhost:5681/health || exit 1"]
          interval: 5s
@@ -48,14 +48,14 @@ services:
     gateway:
       build:
         context: .
-        dockerfile: apps/gateway/Dockerfile
+        dockerfile: cmd/gateway/Dockerfile
       depends_on:
         notes:
           condition: service_healthy
       ports:
         - "5680:5680"
       volumes:
-        - ./apps/gateway/configs/config.yaml:/app/configs/config.yaml:ro
+        - ./config/gateway/config.yaml:/app/configs/config.yaml:ro
         
 
 volumes:
