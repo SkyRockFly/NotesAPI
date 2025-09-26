@@ -9,7 +9,7 @@ services:
       volumes:
         - "pgdata:/var/lib/postgresql/data"
       healthcheck:
-        test: ["CMD-SHELL", "pg_isready -U postgres"]
+        test: ["CMD-SHELL", "pg_isready -U postgres -d notedb"]
         interval: 5s
         timeout: 3s
         retries: 5
@@ -20,22 +20,43 @@ services:
         db:
           condition: service_healthy
       volumes:
-        - ./migrations:/migrations
+        - ./migrations/notes-svc:/migrations:ro
       entrypoint: ["goose", "-dir", "/migrations", "up"]
       environment:
         GOOSE_DRIVER: postgres
         GOOSE_DBSTRING: postgres://postgres:bear@db:5432/notedb?sslmode=disable
-        GOOSE_MIGRATION_DIR: ./migrations
-    app:
-      build: .
+        GOOSE_MIGRATION_DIR: /migrations
+        
+    notes:
+      build: 
+        context: .
+        dockerfile: cmd/notes-svc/Dockerfile
       image: notesapp
       depends_on:
-        db:
+        migrate:
+          condition: service_completed_successfully
+      ports:
+        - "5681:5681"
+      volumes:
+        -  ./config/notes-svc/config.yaml:/app/configs/config.yaml:ro
+      healthcheck:
+         test: ["CMD-SHELL", "wget -qO- --spider http://localhost:5681/health || exit 1"]
+         interval: 5s
+         timeout: 3s
+         retries: 10
+
+    gateway:
+      build:
+        context: .
+        dockerfile: cmd/gateway/Dockerfile
+      depends_on:
+        notes:
           condition: service_healthy
       ports:
         - "5680:5680"
       volumes:
-        - ./configs/config.yaml:/app/configs/config.yaml
+        - ./config/gateway/config.yaml:/app/configs/config.yaml:ro
+        
 
 volumes:
   pgdata:
