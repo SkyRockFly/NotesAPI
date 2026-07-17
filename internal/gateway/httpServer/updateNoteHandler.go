@@ -3,46 +3,49 @@ package httpserver
 import (
 	"fmt"
 	"net/http"
-	userservice "notes/internal/gateway/userService"
+	notesvc "notes/internal/gateway/service/note"
+	"notes/internal/pkg/middlewares"
 )
 
 type updateDTO struct {
-	ID        int    `json:"ID"`
-	AccountID int    `json:"account_id"`
-	Title     string `json:"title"`
-	Body      string `json:"body"`
+	ID    int64  `json:"ID"`
+	Title string `json:"title"`
+	Body  string `json:"body"`
 }
 
 type updateResponse struct {
 	Updated bool `json:"updated"`
 }
 
-func updateNoteHandler(service *userservice.Service) http.HandlerFunc {
+func updateNoteHandler(service *notesvc.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		logger := getCtxLogger(ctx)
 
-		dtoNote, err := decodeJSON[updateDTO](r)
-		if err != nil {
-			logger.Info().Err(fmt.Errorf("decode: %w", err)).Msg("update handler")
-			writeJSON(w, http.StatusBadRequest, logger, errorAPIResponse{Err: "invalid json"})
+		var dtoNote updateDTO
+		if err := decodeJSON(&dtoNote, r); err != nil {
+			handleError(w, fmt.Errorf("decode: %w", err), logger)
 			return
 		}
 
-		note := userservice.UpdateNoteData{
+		uid, ok := ctx.Value(middlewares.UIDKey).(int)
+		if !ok {
+			handleError(w, fmt.Errorf("can't extract UIDKey"), logger)
+			return
+		}
+
+		note := notesvc.UpdateReq{
 			ID:        dtoNote.ID,
-			AccountID: dtoNote.AccountID,
+			AccountID: uid,
 			Title:     dtoNote.Title,
 			Body:      dtoNote.Body,
 		}
 
-		updated, err := service.Update(ctx, note)
-		if err != nil {
-			code, desc := mapToHTTPError(err, logger, "update handler")
-			writeJSON(w, code, logger, errorAPIResponse{Err: desc})
+		if err := service.Update(ctx, note); err != nil {
+			handleError(w, fmt.Errorf("svc.update: %w", err), logger)
 			return
 		}
 
-		writeJSON(w, http.StatusOK, logger, updateResponse{Updated: updated})
+		writeJSON(w, http.StatusNoContent, logger, nil)
 	}
 }

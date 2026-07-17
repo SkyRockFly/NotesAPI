@@ -1,23 +1,22 @@
 package httpserver
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
-	"notes/internal/gateway/testutil"
-	usernoterepo "notes/internal/gateway/userNoteRepo"
-	userservice "notes/internal/gateway/userService"
+	notesvc "notes/internal/gateway/service/note"
 	"notes/internal/pkg/middlewares"
+	"notes/internal/pkg/testutil"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func Test_deleteNoteHandler(t *testing.T) {
 	type wantReq struct {
-		header map[string]string
-		body   string
+		body  string
+		ctxID int
 	}
 	type wantResp struct {
 		code int
@@ -30,108 +29,89 @@ func Test_deleteNoteHandler(t *testing.T) {
 		want wantResp
 	}{
 		{
-			name: "01_OK",
+			name: "#01_OK",
 			req: wantReq{
-				header: map[string]string{"Content-Type": "application/json"},
-				body:   `{"id":2,"account_id":101}`,
+				body:  `{"id":1}`,
+				ctxID: 101,
 			},
 			want: wantResp{
-				code: http.StatusOK,
-				body: `{"deleted":true}`,
+				code: http.StatusNoContent,
+				body: "",
 			},
 		},
 		{
-			name: "02_Non-existing note",
+			name: "#02_NON_EXISTING_NOTE",
 			req: wantReq{
-				header: map[string]string{"Content-Type": "application/json"},
-				body:   `{"id":3,"account_id":101}`,
+				body:  `{"id":2}`,
+				ctxID: 101,
 			},
 			want: wantResp{
 				code: http.StatusNotFound,
-				body: `{"error":"note not found"}`,
+				body: `{"error":"not found"}`,
 			},
 		},
 		{
-			name: "03_Wrong_mediatype",
+			name: "#03_Invalid_json",
 			req: wantReq{
-				body:   `{"account_id":101,"title":"Honey","body":"Bears"}`,
-				header: map[string]string{"Content-Type": "text/plain"},
+				body:  `{"account_id":101,`,
+				ctxID: 101,
 			},
 			want: wantResp{
-				code: http.StatusUnsupportedMediaType,
-				body: "unsupported media type\n",
-			},
-		},
-		{
-			name: "04_Invalid_json",
-			req: wantReq{
-				body:   `{"account_id":101,`,
-				header: map[string]string{"Content-Type": "application/json"},
-			},
-			want: wantResp{
-				code: http.StatusBadRequest,
+				code: http.StatusUnprocessableEntity,
 				body: `{"error":"invalid json"}`,
 			},
 		},
 		{
-			name: "05_Wrong_fields",
+			name: "#04_Wrong_fields",
 			req: wantReq{
-				body:   `{"acc_id":101,"ttl":"x"}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body:  `{"acc_id":101,"ttl":"x"}`,
+				ctxID: 101,
 			},
 			want: wantResp{
-				code: http.StatusBadRequest,
+				code: http.StatusUnprocessableEntity,
 				body: `{"error":"invalid json"}`,
 			},
 		},
 		{
-			name: "06_Invalid_id",
+			name: "#05_Invalid_id",
 			req: wantReq{
-				body:   `{"id":0,"account_id":101}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body:  `{"id":0}`,
+				ctxID: 101,
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
-				body: `{"error":"invalid content of fields"}`,
+				body: `{"error":"bad request"}`,
 			},
 		},
 		{
-			name: "07_Invalid_AccountID",
+			name: "#06_Invalid_AccountID",
 			req: wantReq{
-				body:   `{"id":2,"account_id":0}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body:  `{"id":2}`,
+				ctxID: 0,
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
-				body: `{"error":"invalid content of fields"}`,
+				body: `{"error":"bad request"}`,
 			},
 		},
 	}
 
-	repo := new(mockNoteRepo)
-	svc := userservice.NewService(repo)
+	repo := newTestRepo(t)
+	svc := notesvc.NewService(repo)
 
-	sut := middlewares.DemandJSONHeaders(
-		deleteNoteHandler(svc))
+	sut := deleteNoteHandler(svc)
 
 	method := http.MethodDelete
 	hndURL := "/note/delete"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo.On("Delete", mock.Anything, 2, 101).
-				Return(true, nil).Once()
-			repo.On("Delete", mock.Anything, 3, 101).
-				Return(false, usernoterepo.ErrNotFound).Once()
 			req := httptest.NewRequest(method, hndURL, strings.NewReader(tt.req.body))
 
-			for k, v := range tt.req.header {
-				req.Header.Set(k, v)
-			}
-
 			rr := httptest.NewRecorder()
+			idCtx := context.WithValue(req.Context(), middlewares.UIDKey, tt.req.ctxID)
 
-			sut.ServeHTTP(rr, req)
+			sut.ServeHTTP(rr, req.WithContext(idCtx))
 
 			assert.Equal(t, tt.want.code, rr.Code)
 			assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body),

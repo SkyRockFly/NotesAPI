@@ -1,39 +1,57 @@
 package httpserver
 
 import (
+	"fmt"
 	"net/http"
 	noteservice "notes/internal/notes-svc/noteService"
 )
+
+type ListDTO struct {
+	AccountID int   `json:"account_id"`
+	Limit     int   `json:"limit"`
+	Cursor    int64 `json:"cursor"`
+	Next      bool  `json:"next"`
+}
+
+type ListResp struct {
+	CursorNext int64          `json:"cursor_next"`
+	CursorPrev int64          `json:"cursor_prev"`
+	Notes      []NoteResponse `json:"notes"`
+	HasMore    bool           `json:"has_more"`
+}
 
 func HTTPListNoteHandler(service *noteservice.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		logger := getCtxLogger(ctx)
 
-		noteDTO, err := parseJSON(r)
-		if err != nil {
-			logger.
-				Warn().
-				Str("parse", "invalid json")
-			writeJSON(w, http.StatusBadRequest,
-				logger, errorAPIResponse{Err: "invalid json"})
+		var dto ListDTO
+		if err := decodeJSON(&dto, r); err != nil {
+			handleError(w, fmt.Errorf("decode:%w", err), logger)
 			return
 		}
-		note := remapDTOtoSVC(noteDTO)
 
-		notes, err := service.List(ctx, note)
+		listReq := noteservice.ListReq{
+			AccountID: dto.AccountID,
+			Limit:     dto.Limit,
+			Cursor:    dto.Cursor,
+			Next:      dto.Next,
+		}
+
+		svcResp, err := service.List(ctx, listReq)
 		if err != nil {
-			code, info := mapToHTTPError(err, logger)
-			logger.
-				Warn().
-				Err(err).
-				Msg("service error")
-			writeJSON(w, code,
-				logger, info)
+			handleError(w, fmt.Errorf("svc.List:%w", err), logger)
 			return
 		}
-		respNotes := remapListToResp(notes)
+		respNotes := remapListToResp(svcResp.Notes)
+
+		resp := ListResp{
+			CursorNext: svcResp.CursorNext,
+			CursorPrev: svcResp.CursorPrev,
+			Notes:      respNotes,
+			HasMore:    svcResp.HasMore,
+		}
 		writeJSON(w, http.StatusOK,
-			logger, respNotes)
+			logger, resp)
 	}
 }

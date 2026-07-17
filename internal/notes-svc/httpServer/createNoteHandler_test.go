@@ -3,7 +3,8 @@ package httpserver
 import (
 	"net/http"
 	"net/http/httptest"
-	"notes/internal/notes-svc/testutil"
+	"notes/internal/pkg/middlewares"
+	"notes/internal/pkg/testutil"
 	"strings"
 	"testing"
 
@@ -11,15 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const fixturePath = "./testdata/fixtures/note.sql"
-
 func TestHTTPCreateNoteHandler(t *testing.T) {
-	require.NoError(t, testutil.LoadFixtures(pool, fixturePath))
-	sut := HTTPCreateNoteHandler(svc)
+	require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
+	sut := middlewares.LogMiddleware(HTTPCreateNoteHandler(svc))
 
 	type wantReq struct {
-		body   string
-		header map[string]string
+		body string
 	}
 	type wantResp struct {
 		code int
@@ -31,43 +29,39 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 		want wantResp
 	}{
 		{
-			name: "01_Wrong_mediatype",
+			name: "#01_OK",
 			req: wantReq{
-				body:   `{"account_id":101,"title":"Honey","body":"Bears"}`,
-				header: map[string]string{"Content-Type": "text/plain"},
+				body: `{"account_id":101,"title":"test title","body":"test body"}`,
 			},
 			want: wantResp{
-				code: http.StatusUnsupportedMediaType,
-				body: "unsupported media type\n",
+				code: http.StatusCreated,
+				body: `{"id":6}`,
 			},
 		},
 		{
-			name: "02_Invalid_json",
+			name: "#02_INVALID_JSON",
 			req: wantReq{
-				body:   `{"account_id":101,`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body: `{"account_id":101,`,
 			},
 			want: wantResp{
-				code: http.StatusBadRequest,
+				code: http.StatusUnprocessableEntity,
 				body: `{"error":"invalid json"}`,
 			},
 		},
 		{
-			name: "03_Wrong_fields",
+			name: "#03_BAD_FIELDS",
 			req: wantReq{
-				body:   `{"acc_id":101,"ttl":"x"}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body: `{"acc_id":101,"ttl":"x"}`,
 			},
 			want: wantResp{
-				code: http.StatusBadRequest,
+				code: http.StatusUnprocessableEntity,
 				body: `{"error":"invalid json"}`,
 			},
 		},
 		{
-			name: "04_Invalid_id",
+			name: "04_INVALID_ID",
 			req: wantReq{
-				body:   `{"account_id":0,"title":"x","body":"y"}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body: `{"account_id":0,"title":"x","body":"y"}`,
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
@@ -75,14 +69,13 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "05_Ok",
+			name: "05_INVALID_TITLE",
 			req: wantReq{
-				body:   `{"account_id":101,"title":"Honey","body":"Bears"}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body: `{"account_id":1,"title":"","body":"y"}`,
 			},
 			want: wantResp{
-				code: http.StatusCreated,
-				body: `{"id":6}`,
+				code: http.StatusBadRequest,
+				body: `{"error":"invalid content of fields"}`,
 			},
 		},
 	}
@@ -95,14 +88,9 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			req := httptest.NewRequest(method, url, strings.NewReader(tt.req.body))
 			rr := httptest.NewRecorder()
 
-			for k, v := range tt.req.header {
-				req.Header.Set(k, v)
-			}
-
 			sut.ServeHTTP(rr, req)
 			assert.Equal(t, tt.want.code, rr.Code, "status code")
-			assert.Equal(t, normalizeJSON(t, tt.want.body), normalizeJSON(t, tt.want.body))
-
+			assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body), testutil.NormalizeJSON(t, tt.want.body))
 		})
 	}
 }

@@ -1,22 +1,22 @@
 package httpserver
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
-	"notes/internal/gateway/testutil"
-	userservice "notes/internal/gateway/userService"
+	userservice "notes/internal/gateway/service/note"
 	"notes/internal/pkg/middlewares"
+	"notes/internal/pkg/testutil"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func Test_createNoteHandler(t *testing.T) {
 	type wantReq struct {
-		header map[string]string
-		body   string
+		body  string
+		ctxID int
 	}
 	type wantResp struct {
 		code int
@@ -28,10 +28,10 @@ func Test_createNoteHandler(t *testing.T) {
 		want wantResp
 	}{
 		{
-			name: "01_OK",
+			name: "#01_OK",
 			req: wantReq{
-				header: map[string]string{"Content-Type": "application/json"},
-				body:   `{"account_id":101,"title":"Hank","body":"Bears"}`,
+				body:  `{"title":"test title","body":"test body"}`,
+				ctxID: 101,
 			},
 			want: wantResp{
 				code: http.StatusCreated,
@@ -39,84 +39,78 @@ func Test_createNoteHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "02_Wrong_mediatype",
+			name: "#02_Invalid_json",
 			req: wantReq{
-				body:   `{"account_id":101,"title":"Honey","body":"Bears"}`,
-				header: map[string]string{"Content-Type": "text/plain"},
+				body:  `{"account_id":101,`,
+				ctxID: 101,
 			},
 			want: wantResp{
-				code: http.StatusUnsupportedMediaType,
-				body: "unsupported media type\n",
-			},
-		},
-		{
-			name: "03_Invalid_json",
-			req: wantReq{
-				body:   `{"account_id":101,`,
-				header: map[string]string{"Content-Type": "application/json"},
-			},
-			want: wantResp{
-				code: http.StatusBadRequest,
+				code: http.StatusUnprocessableEntity,
 				body: `{"error":"invalid json"}`,
 			},
 		},
 		{
-			name: "04_Wrong_fields",
+			name: "#03_Wrong_fields",
 			req: wantReq{
-				body:   `{"acc_id":101,"ttl":"x"}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body:  `{"acc_id":101,"ttl":"x"}`,
+				ctxID: 101,
 			},
 			want: wantResp{
-				code: http.StatusBadRequest,
+				code: http.StatusUnprocessableEntity,
 				body: `{"error":"invalid json"}`,
 			},
 		},
 		{
-			name: "05_Invalid_id",
+			name: "#04_Invalid_id",
 			req: wantReq{
-				body:   `{"account_id":0,"title":"x","body":"y"}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body:  `{"title":"x","body":"y"}`,
+				ctxID: 0,
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
-				body: `{"error":"invalid content of fields"}`,
+				body: `{"error":"bad request"}`,
 			},
 		},
 		{
-			name: "06_Empty_title",
+			name: "#05_Empty_title",
 			req: wantReq{
-				body:   `{"account_id":0,"title":"x","body":"y"}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body:  `{"title":"","body":"y"}`,
+				ctxID: 101,
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
-				body: `{"error":"invalid content of fields"}`,
+				body: `{"error":"bad request"}`,
+			},
+		},
+		{
+			name: "#06_NOT_FOUND",
+			req: wantReq{
+				body:  `{"title":"test title","body":"test body"}`,
+				ctxID: 102,
+			},
+			want: wantResp{
+				code: http.StatusNotFound,
+				body: `{"error":"not found"}`,
 			},
 		},
 	}
 
-	repo := new(mockNoteRepo)
+	repo := newTestRepo(t)
 	svc := userservice.NewService(repo)
 
-	sut := middlewares.DemandJSONHeaders(
-		createNoteHandler(svc))
+	sut := middlewares.LogMiddleware(createNoteHandler(svc))
 
 	method := http.MethodPost
 	hndURL := "/note/create"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo.On("Create", mock.Anything, mock.AnythingOfType("int"), mock.Anything, mock.Anything).
-				Return(1, nil).Once()
 			req := httptest.NewRequest(method, hndURL, strings.NewReader(tt.req.body))
 
-			for k, v := range tt.req.header {
-				req.Header.Set(k, v)
-			}
-
 			rr := httptest.NewRecorder()
+			idCtx := context.WithValue(req.Context(), middlewares.UIDKey, tt.req.ctxID)
 
-			sut.ServeHTTP(rr, req)
+			sut.ServeHTTP(rr, req.WithContext(idCtx))
 
 			assert.Equal(t, tt.want.code, rr.Code)
 			assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body),

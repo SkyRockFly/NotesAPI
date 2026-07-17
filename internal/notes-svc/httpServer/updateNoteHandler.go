@@ -1,12 +1,16 @@
 package httpserver
 
 import (
+	"fmt"
 	"net/http"
 	noteservice "notes/internal/notes-svc/noteService"
 )
 
-type UpdateNoteResp struct {
-	Updated bool `json:"updated"`
+type UpdateDTO struct {
+	ID        int64  `json:"id"`
+	AccountID int    `json:"account_id"`
+	Title     string `json:"title"`
+	Body      string `json:"body"`
 }
 
 func HTTPUpdateNoteHandler(service *noteservice.Service) http.HandlerFunc {
@@ -14,29 +18,25 @@ func HTTPUpdateNoteHandler(service *noteservice.Service) http.HandlerFunc {
 		ctx := r.Context()
 		logger := getCtxLogger(ctx)
 
-		noteDTO, err := parseJSON(r)
-		if err != nil {
-			logger.
-				Warn().
-				Str("parse", "invalid json")
-			writeJSON(w, http.StatusBadRequest,
-				logger, errorAPIResponse{Err: "invalid json"})
+		var dto UpdateDTO
+		if err := decodeJSON(&dto, r); err != nil {
+			handleError(w, fmt.Errorf("decode:%w", err), logger)
 			return
 		}
 
-		note := remapDTOtoSVC(noteDTO)
-		if err := service.Update(ctx, note); err != nil {
-			code, info := mapToHTTPError(err, logger)
-			logger.
-				Warn().
-				Err(err).
-				Msg("service error")
-			writeJSON(w, code,
-				logger, info)
+		updateReq := noteservice.UpdateReq{
+			AccountID: dto.AccountID,
+			ID:        dto.ID,
+			Title:     dto.Title,
+			Body:      dto.Body,
+		}
+
+		if err := service.Update(ctx, updateReq); err != nil {
+			handleError(w, fmt.Errorf("svc.Update:%w", err), logger)
 			return
 		}
 
-		writeJSON(w, http.StatusOK,
-			logger, UpdateNoteResp{Updated: true})
+		writeJSON(w, http.StatusNoContent,
+			logger, nil)
 	}
 }

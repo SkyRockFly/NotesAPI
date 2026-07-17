@@ -1,5 +1,5 @@
 services:
-    db:
+    db-notessvc:
       image: postgres:16
       environment:
         POSTGRES_PASSWORD: bear
@@ -7,24 +7,53 @@ services:
       ports:
         - "5432:5432"
       volumes:
-        - "pgdata:/var/lib/postgresql/data"
+        - "pgdata_notessvc:/var/lib/postgresql/data"
       healthcheck:
         test: ["CMD-SHELL", "pg_isready -U postgres -d notedb"]
         interval: 5s
         timeout: 3s
         retries: 5
+
+    db-gateway:
+      image: postgres:16
+      environment:
+        POSTGRES_PASSWORD: bear
+        POSTGRES_DB: gatewaydb
+      ports:
+        - "5433:5432"
+      volumes:
+        - "pgdata_gateway:/var/lib/postgresql/data"
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U postgres -d gatewaydb"]
+        interval: 5s
+        timeout: 3s
+        retries: 5
+
         
-    migrate:
+    migrate-notessvc:
       image: ghcr.io/kukymbr/goose-docker:3.24.3
       depends_on:
-        db:
+        db-notessvc:
           condition: service_healthy
       volumes:
         - ./migrations/notes-svc:/migrations:ro
       entrypoint: ["goose", "-dir", "/migrations", "up"]
       environment:
         GOOSE_DRIVER: postgres
-        GOOSE_DBSTRING: postgres://postgres:bear@db:5432/notedb?sslmode=disable
+        GOOSE_DBSTRING: postgres://postgres:bear@db-notessvc:5432/notedb?sslmode=disable
+        GOOSE_MIGRATION_DIR: /migrations
+
+    migrate-gateway:
+      image: ghcr.io/kukymbr/goose-docker:3.24.3
+      depends_on:
+        db-gateway:
+          condition: service_healthy
+      volumes:
+        - ./migrations/gateway:/migrations:ro
+      entrypoint: ["goose", "-dir", "/migrations", "up"]
+      environment:
+        GOOSE_DRIVER: postgres
+        GOOSE_DBSTRING: postgres://postgres:bear@db-gateway:5432/gatewaydb?sslmode=disable
         GOOSE_MIGRATION_DIR: /migrations
         
     notes:
@@ -33,7 +62,7 @@ services:
         dockerfile: cmd/notes-svc/Dockerfile
       image: notesapp
       depends_on:
-        migrate:
+        migrate-notessvc:
           condition: service_completed_successfully
       ports:
         - "5681:5681"
@@ -44,6 +73,9 @@ services:
          interval: 5s
          timeout: 3s
          retries: 10
+      secrets:
+        - source: jwt_secret
+          target: /run/secrets/jwt_secret
 
     gateway:
       build:
@@ -52,11 +84,23 @@ services:
       depends_on:
         notes:
           condition: service_healthy
+        migrate-gateway:
+          condition: service_completed_successfully
       ports:
         - "5680:5680"
       volumes:
         - ./config/gateway/config.yaml:/app/configs/config.yaml:ro
+      healthcheck:
+         test: ["CMD-SHELL", "wget -qO- --spider http://localhost:5680/health || exit 1"]
+         interval: 5s
+         timeout: 3s
+         retries: 10
         
+secrets:
+  jwt_secret:
+    file: ./secrets/jwt_secret
+  
 
 volumes:
-  pgdata:
+  pgdata_notessvc:
+  pgdata_gateway:

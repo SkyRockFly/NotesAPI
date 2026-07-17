@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	noterepository "notes/internal/notes-svc/noteRepository"
+	"notes/internal/pkg/apperror"
 	"notes/internal/pkg/middlewares"
 	"sync/atomic"
 	"time"
@@ -33,15 +33,8 @@ type healthResponse struct {
 	Health bool `json:"health"`
 }
 
-type DTO struct {
-	ID        int    `json:"id,omitempty"`
-	AccountID int    `json:"account_id,omitempty"`
-	Title     string `json:"title,omitempty"`
-	Body      string `json:"body,omitempty"`
-}
-
 type NoteResponse struct {
-	ID        int       `json:"id"`
+	ID        int64     `json:"id"`
 	AccountID int       `json:"account_id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
@@ -53,31 +46,31 @@ func StartServer(ctx context.Context, port string, service *noteservice.Service)
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /note/create",
 		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
+			middlewares.JSONReqSizeMiddleware(
 				middlewares.DemandJSONHeaders(
 					HTTPCreateNoteHandler(service)))))
 
 	mux.HandleFunc("DELETE /note/delete",
 		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
+			middlewares.JSONReqSizeMiddleware(
 				middlewares.DemandJSONHeaders(
 					HTTPDeleteNoteHandler(service)))))
 
 	mux.HandleFunc("PUT /note/update",
 		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
+			middlewares.JSONReqSizeMiddleware(
 				middlewares.DemandJSONHeaders(
 					HTTPUpdateNoteHandler(service)))))
 
 	mux.HandleFunc("POST /note/get",
 		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
+			middlewares.JSONReqSizeMiddleware(
 				middlewares.DemandJSONHeaders(
 					HTTPGetNoteHandler(service)))))
 
 	mux.HandleFunc("POST /notes/get",
 		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
+			middlewares.JSONReqSizeMiddleware(
 				middlewares.DemandJSONHeaders(
 					HTTPListNoteHandler(service)))))
 
@@ -158,14 +151,17 @@ func remapListToResp(notes []noteservice.Note) []NoteResponse {
 	return servNotes
 }
 
-func parseJSON(r *http.Request) (DTO, error) {
+func decodeJSON(str any, r *http.Request) error {
+	if str == nil {
+		return fmt.Errorf("decode: empty struct")
+	}
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
-	var note DTO
-	if err := dec.Decode(&note); err != nil {
-		return DTO{}, fmt.Errorf("parse: %w", err)
+	if err := dec.Decode(str); err != nil {
+		return fmt.Errorf("%w, decode: %w", apperror.ErrInvalidJSON, err)
 	}
-	return note, nil
+
+	return nil
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, logger *zerolog.Logger, resp any) {
@@ -180,6 +176,9 @@ func writeJSON(w http.ResponseWriter, statusCode int, logger *zerolog.Logger, re
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
+	if statusCode == http.StatusNoContent {
+		return
+	}
 	if _, err := w.Write(buf.Bytes()); err != nil {
 		logger.Error().Err(fmt.Errorf("write: %w", err)).Msg("write JSON")
 		return
@@ -196,16 +195,6 @@ func getCtxLogger(ctx context.Context) *zerolog.Logger {
 	return &logger
 }
 
-func remapDTOtoSVC(noteDTO DTO) noteservice.Note {
-	serviceNote := noteservice.Note{
-		ID:        noteDTO.ID,
-		AccountID: noteDTO.AccountID,
-		Title:     noteDTO.Title,
-		Body:      noteDTO.Body,
-	}
-	return serviceNote
-}
-
 func remapSVCToResp(servNote noteservice.Note) NoteResponse {
 	respNote := NoteResponse{
 		ID:        servNote.ID,
@@ -218,16 +207,46 @@ func remapSVCToResp(servNote noteservice.Note) NoteResponse {
 	return respNote
 }
 
-func mapToHTTPError(err error, log *zerolog.Logger) (int, any) {
+func handleError(w http.ResponseWriter, err error, log *zerolog.Logger) {
+	var (
+		code  int
+		resp  errorAPIResponse
+		level = zerolog.InfoLevel
+	)
 	switch {
-	case errors.Is(err, noteservice.ErrInvalid):
-		log.Info().Msg("invalid content of JSON fields")
-		return http.StatusBadRequest, errorAPIResponse{Err: "invalid content of fields"}
-	case errors.Is(err, noterepository.ErrNotFound):
-		log.Info().Msg("note was not found in repository")
-		return http.StatusNotFound, errorAPIResponse{Err: "note not found"}
+	case errors.Is(err, apperror.ErrInvalidJSON):
+		code = http.StatusUnprocessableEntity
+		resp.Err = "invalid json"
+
+	case errors.Is(err, apperror.ErrBadRequest):
+		code = http.StatusBadRequest
+		resp.Err = "bad request"
+
+	case errors.Is(err, apperror.ErrNotFound):
+		code = http.StatusNotFound
+		resp.Err = "not found"
+
+	case errors.Is(err, apperror.ErrBackend):
+		level = zerolog.ErrorLevel
+		code = http.StatusBadGateway
+		resp.Err = "gateway error"
+
+	case errors.Is(err, apperror.ErrAlreadyExists):
+		code = http.StatusConflict
+		resp.Err = "already exists"
+
+	case errors.Is(err, apperror.ErrUnauthorized):
+		code = http.StatusUnauthorized
+		resp.Err = "unauthorized"
 	default:
-		log.Error()
-		return http.StatusInternalServerError, errorAPIResponse{Err: "service error"}
+		level = zerolog.ErrorLevel
+		code = http.StatusInternalServerError
+		resp.Err = "service error"
 	}
+
+	log.WithLevel(level).
+		Err(fmt.Errorf("response: %w", err)).
+		Msg("request failed")
+
+	writeJSON(w, code, log, resp)
 }

@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
-	usernoterepo "notes/internal/gateway/userNoteRepo"
-	userservice "notes/internal/gateway/userService"
+	authsvc "notes/internal/gateway/service/auth"
+	notesvc "notes/internal/gateway/service/note"
+	"notes/internal/pkg/apperror"
 	"notes/internal/pkg/middlewares"
 	"strconv"
 	"sync/atomic"
@@ -34,7 +36,7 @@ type healthResponse struct {
 }
 
 type ResponseNote struct {
-	ID        int       `json:"id"`
+	ID        int64     `json:"id"`
 	AccountID int       `json:"account_id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
@@ -42,41 +44,114 @@ type ResponseNote struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func StartServer(ctx context.Context, port int, service *userservice.Service) error {
+type AuthResp struct {
+	Access  string `json:"access,omitempty"`
+	Refresh string `json:"refresh,omitempty"`
+}
+
+type ServerOpts struct {
+	SVCnotes       *notesvc.Service
+	SVCauth        authsvc.IAuthSVC
+	Secret         []byte
+	Port           int
+	RateLimiterCfg middlewares.RateLimiterParameters
+}
+
+type MW func(http.HandlerFunc) http.HandlerFunc
+
+func Pipe(h http.HandlerFunc, mws ...MW) http.HandlerFunc {
+	for i := len(mws) - 1; i >= 0; i-- {
+		h = mws[i](h)
+	}
+	return h
+}
+
+func StartServer(ctx context.Context, opts ServerOpts) error {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /note/get",
-		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
-				middlewares.DemandJSONHeaders(
-					getNoteHandler(service)))))
+	authMW := middlewares.Auth(opts.Secret, 20*time.Second)
 
-	mux.HandleFunc("DELETE /note/delete",
-		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
-				middlewares.DemandJSONHeaders(
-					deleteNoteHandler(service)))))
+	rlAuth, err := middlewares.NewRateLimiter(ctx, getIPKey, opts.RateLimiterCfg)
+	if err != nil {
+		return fmt.Errorf("init rate limiter IP: %w", err)
+	}
 
-	mux.HandleFunc("POST /notes",
-		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
-				middlewares.DemandJSONHeaders(
-					listNoteHandler(service)))))
+	mux.HandleFunc("POST /auth/signup", Pipe(
+		signUpHandler(opts.SVCauth),
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
+		middlewares.LogMiddleware,
+		rlAuth.RateLimitMiddleware,
+	))
 
-	mux.HandleFunc("PUT /note/update",
-		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
-				middlewares.DemandJSONHeaders(
-					updateNoteHandler(service)))))
+	mux.HandleFunc("POST /auth/signin", Pipe(
+		signInHandler(opts.SVCauth),
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
+		middlewares.LogMiddleware,
+		rlAuth.RateLimitMiddleware,
+	))
 
-	mux.HandleFunc("POST /note/create",
-		middlewares.LogMiddleware(
-			middlewares.JSONFileSizeMiddleware(
-				middlewares.DemandJSONHeaders(
-					createNoteHandler(service)))))
+	mux.HandleFunc("POST /auth/refresh", Pipe(
+		refreshHandler(opts.SVCauth),
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
+		middlewares.LogMiddleware,
+		rlAuth.RateLimitMiddleware,
+	))
+
+	rlUID, err := middlewares.NewRateLimiter(ctx, getUIDKey, opts.RateLimiterCfg)
+	if err != nil {
+		return fmt.Errorf("init rate limiter UID: %w", err)
+	}
+
+	mux.HandleFunc("POST /note/get", Pipe(
+		getNoteHandler(opts.SVCnotes),
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
+		rlUID.RateLimitMiddleware,
+		authMW,
+		middlewares.LogMiddleware,
+	))
+
+	mux.HandleFunc("DELETE /note/delete", Pipe(
+		deleteNoteHandler(opts.SVCnotes),
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
+		rlUID.RateLimitMiddleware,
+		authMW,
+		middlewares.LogMiddleware,
+	))
+
+	mux.HandleFunc("POST /note/list", Pipe(
+		listNoteHandler(opts.SVCnotes),
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
+		rlUID.RateLimitMiddleware,
+		authMW,
+		middlewares.LogMiddleware,
+	))
+
+	mux.HandleFunc("PUT /note/update", Pipe(
+		updateNoteHandler(opts.SVCnotes),
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
+		rlUID.RateLimitMiddleware,
+		authMW,
+		middlewares.LogMiddleware,
+	))
+
+	mux.HandleFunc("POST /note/create", Pipe(
+		createNoteHandler(opts.SVCnotes),
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
+		rlUID.RateLimitMiddleware,
+		authMW,
+		middlewares.LogMiddleware,
+	))
 
 	server := &http.Server{
-		Addr:    ":" + strconv.Itoa(port),
+		Addr:    ":" + strconv.Itoa(opts.Port),
 		Handler: mux,
 	}
 
@@ -133,7 +208,6 @@ func HealthCheckHandler() http.HandlerFunc {
 
 func writeJSON(w http.ResponseWriter, statusCode int, logger *zerolog.Logger, resp any) {
 	var buf bytes.Buffer
-
 	if err := json.NewEncoder(&buf).Encode(resp); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -141,26 +215,32 @@ func writeJSON(w http.ResponseWriter, statusCode int, logger *zerolog.Logger, re
 		logger.Error().Err(fmt.Errorf("encode: %w", err)).Msg("write JSON")
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
+	if statusCode == http.StatusNoContent {
+		return
+	}
 	if _, err := w.Write(buf.Bytes()); err != nil {
 		logger.Error().Err(fmt.Errorf("write: %w", err)).Msg("write JSON")
 		return
 	}
 }
 
-func decodeJSON[T any](r *http.Request) (T, error) {
+func decodeJSON(str any, r *http.Request) error {
+	if str == nil {
+		return fmt.Errorf("decode: empty struct")
+	}
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
-	var obj T
-	if err := dec.Decode(&obj); err != nil {
-		return obj, fmt.Errorf("decode: %w", err)
+	if err := dec.Decode(str); err != nil {
+		return fmt.Errorf("%w, decode: %w", apperror.ErrInvalidJSON, err)
 	}
 
-	return obj, nil
+	return nil
 }
 
-func remapSvcToRespNote(note userservice.Note) ResponseNote {
+func remapSvcToRespNote(note notesvc.Note) ResponseNote {
 	newNote := ResponseNote{
 		ID:        note.ID,
 		AccountID: note.AccountID,
@@ -183,16 +263,68 @@ func getCtxLogger(ctx context.Context) *zerolog.Logger {
 	return &logger
 }
 
-func mapToHTTPError(err error, log *zerolog.Logger, hndName string) (int, string) {
+func handleError(w http.ResponseWriter, err error, log *zerolog.Logger) {
+	var (
+		code  int
+		resp  errorAPIResponse
+		level = zerolog.InfoLevel
+	)
 	switch {
-	case errors.Is(err, userservice.ErrInvalid):
-		log.Info().Err(fmt.Errorf("service: %w", err)).Msg(hndName)
-		return http.StatusBadRequest, "invalid content of fields"
-	case errors.Is(err, usernoterepo.ErrNotFound):
-		log.Info().Err(fmt.Errorf("service: %w", err)).Msg(hndName)
-		return http.StatusNotFound, "note not found"
+	case errors.Is(err, apperror.ErrInvalidJSON):
+		code = http.StatusUnprocessableEntity
+		resp.Err = "invalid json"
+
+	case errors.Is(err, apperror.ErrBadRequest):
+		code = http.StatusBadRequest
+		resp.Err = "bad request"
+
+	case errors.Is(err, apperror.ErrNotFound):
+		code = http.StatusNotFound
+		resp.Err = "not found"
+
+	case errors.Is(err, apperror.ErrBackend):
+		level = zerolog.ErrorLevel
+		code = http.StatusBadGateway
+		resp.Err = "gateway error"
+
+	case errors.Is(err, apperror.ErrAlreadyExists):
+		code = http.StatusConflict
+		resp.Err = "already exists"
+
+	case errors.Is(err, apperror.ErrUnauthorized):
+		code = http.StatusUnauthorized
+		resp.Err = "unauthorized"
 	default:
-		log.Error().Err(fmt.Errorf("service: %w", err)).Msg(hndName)
-		return http.StatusInternalServerError, "service error"
+		level = zerolog.ErrorLevel
+		code = http.StatusInternalServerError
+		resp.Err = "service error"
 	}
+
+	log.WithLevel(level).
+		Err(fmt.Errorf("response: %w", err)).
+		Msg("request failed")
+	writeJSON(w, code, log, resp)
+}
+
+func getUIDKey(r *http.Request) (string, error) {
+	ctx := r.Context()
+	uid, ok := ctx.Value(middlewares.UIDKey).(int)
+	if !ok {
+		return "", fmt.Errorf("can't extract uid")
+	}
+	key := strconv.Itoa(uid)
+	return key, nil
+}
+
+func getIPKey(r *http.Request) (string, error) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
+		return host, nil
+	}
+
+	if ip := net.ParseIP(r.RemoteAddr); ip != nil {
+		return ip.String(), nil
+	}
+
+	return "", fmt.Errorf("invalid RemoteAddr %q: %w", r.RemoteAddr, err)
 }

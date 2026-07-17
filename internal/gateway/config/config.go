@@ -1,10 +1,13 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
+	"notes/internal/pkg/kit"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog"
@@ -13,10 +16,12 @@ import (
 )
 
 type AppConfig struct {
-	Server   ServerConfig     `yaml:"server" validate:"required"`
-	DB       DBConfig         `yaml:"db" validate:"required"`
-	Log      LoggerConfig     `yaml:"logger" validate:"required"`
-	NotesSvc ConnectionConfig `yaml:"notes-svc" validate:"required"`
+	Server      ServerConfig      `yaml:"server" validate:"required"`
+	DB          DBConfig          `yaml:"db" validate:"required"`
+	Log         LoggerConfig      `yaml:"logger" validate:"required"`
+	NotesSvc    ConnectionConfig  `yaml:"notes-svc" validate:"required"`
+	Auth        AuthConfig        `yaml:"auth" validate:"required"`
+	RateLimiter RateLimiterConfig `yaml:"rate_limiter" validate:"required"`
 }
 
 type ServerConfig struct {
@@ -36,6 +41,19 @@ type LoggerConfig struct {
 	Timestamp   string `yaml:"timestamp" validate:"required,timestamp"`
 	FormatLevel string `yaml:"formatlevel" validate:"required,formatlevel"`
 	Level       string `yaml:"level" validate:"required,loglevel"`
+}
+
+type AuthConfig struct {
+	JWTSecretFile string `yaml:"jwt_secret_file" validate:"required"`
+	JWTSecret     []byte
+}
+
+type RateLimiterConfig struct {
+	Requests        int           `yaml:"requests" validate:"min=1,max=10000"`
+	Period          time.Duration `yaml:"period" validate:"min=1s,max=24h"`
+	Burst           int           `yaml:"burst" validate:"min=1,max=50"`
+	VisitorTTL      time.Duration `yaml:"visitor_ttl" validate:"min=1m,max=168h"`
+	CleanupInterval time.Duration `yaml:"cleanup_interval" validate:"min=1m,max=24h"`
 }
 
 func initValidator() (*validator.Validate, error) {
@@ -124,16 +142,22 @@ func GetAppConfig() (*AppConfig, error) {
 		return nil, fmt.Errorf("GetAppConfig: %w", err)
 	}
 
-	if err := v.Struct(config); err != nil {
-		if errs, ok := err.(validator.ValidationErrors); ok {
-			var b strings.Builder
-			for _, e := range errs {
-				fmt.Fprintf(&b, "%s failed on '%s'\n", e.Namespace(), e.Tag())
-			}
-			return nil, fmt.Errorf("GetAppConfig: \n %s", b.String())
-		}
-		return nil, fmt.Errorf("GetAppConfig: %w", err)
+	if err := kit.ValidateStruct(v, config); err != nil {
+		return nil, fmt.Errorf("validate struct: %w", err)
 	}
 
 	return config, nil
+}
+
+func GetSecretKey(auth *AuthConfig) error {
+	b, err := os.ReadFile(auth.JWTSecretFile)
+	if err != nil {
+		return fmt.Errorf("read file: %w", err)
+	}
+	key := bytes.TrimSpace(b)
+	if len(key) < 32 {
+		return fmt.Errorf("weak secret key")
+	}
+	auth.JWTSecret = key
+	return nil
 }

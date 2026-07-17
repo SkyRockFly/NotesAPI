@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -23,7 +24,11 @@ func (r *middlewareResponseWriter) Header() http.Header {
 }
 
 func (r *middlewareResponseWriter) Write(w []byte) (int, error) {
-	return r.w.Write(w)
+	num, err := r.w.Write(w)
+	if err != nil {
+		return 0, fmt.Errorf("%w", err)
+	}
+	return num, nil
 }
 
 func (r *middlewareResponseWriter) WriteHeader(statusCode int) {
@@ -38,26 +43,40 @@ func LogMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			requestID = uuid.New().String()
 		}
 
+		route := r.Pattern
+		if route == "" {
+			route = r.Method + " " + r.URL.Path
+		}
+
 		sw := &middlewareResponseWriter{w: w, statusCode: -1}
 
-		subLogger := log.With().Str("requestID", requestID).Logger()
+		subLogger := log.With().
+			Str("requestID", requestID).
+			Str("route", route).
+			Logger()
 
-		subLogger.Info().
-			Str("path", r.URL.Path).
-			Str("method", r.Method).Msg("in")
+		ctx := context.WithValue(
+			r.Context(),
+			LoggerCtxKey,
+			subLogger,
+		)
 
-		ctx := context.WithValue(r.Context(), LoggerCtxKey, subLogger)
 		startTime := time.Now()
 		next(sw, r.WithContext(ctx))
 		duration := time.Since(startTime)
-		if sw.statusCode >= 100 && sw.statusCode < 400 {
-			subLogger.Info().Int("status", sw.statusCode).Int64("time_ms", duration.Milliseconds()).Msg("out")
+
+		event := subLogger.Info()
+
+		switch {
+		case sw.statusCode >= 500:
+			event = subLogger.Error()
+		case sw.statusCode >= 400:
+			event = subLogger.Warn()
 		}
-		if sw.statusCode >= 400 && sw.statusCode < 500 {
-			subLogger.Warn().Int("status", sw.statusCode).Int64("time_ms", duration.Milliseconds()).Msg("out")
-		}
-		if sw.statusCode >= 500 && sw.statusCode < 600 {
-			subLogger.Error().Int("status", sw.statusCode).Int64("time_ms", duration.Milliseconds()).Msg("out")
-		}
+
+		event.
+			Int("status", sw.statusCode).
+			Int64("time_ms", duration.Milliseconds()).
+			Msg("out")
 	}
 }

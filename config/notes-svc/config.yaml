@@ -1,7 +1,7 @@
 server:
   port: "5681"
 db:
-  url: "postgres://postgres:bear@db:5432/notedb"
+  url: "postgres://postgres:bear@db-notessvc:5432/notedb"
 logger:
   timestamp: "2006-01-02 15:04:05"
   formatlevel: "%-6s"

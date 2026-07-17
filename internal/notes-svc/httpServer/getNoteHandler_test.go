@@ -3,7 +3,7 @@ package httpserver
 import (
 	"net/http"
 	"net/http/httptest"
-	"notes/internal/notes-svc/testutil"
+	"notes/internal/pkg/testutil"
 	"strings"
 	"testing"
 
@@ -12,12 +12,11 @@ import (
 )
 
 func TestHTTPGetNoteHandler(t *testing.T) {
-	require.NoError(t, testutil.LoadFixtures(pool, fixturePath))
+	require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
 	sut := HTTPGetNoteHandler(svc)
 
 	type wantReq struct {
-		body   string
-		header map[string]string
+		body string
 	}
 	type wantResp struct {
 		code int
@@ -30,71 +29,55 @@ func TestHTTPGetNoteHandler(t *testing.T) {
 		want wantResp
 	}{
 		{
-			name: "01_Wrong_mediatype",
+			name: "#01_OK",
 			req: wantReq{
-				body:   `{"account_id":101,"title":"Honey","body":"Bears"}`,
-				header: map[string]string{"Content-Type": "text/plain"},
-			},
-			want: wantResp{
-				code: http.StatusUnsupportedMediaType,
-				body: "unsupported media type\n",
-			},
-		},
-		{
-			name: "02_Invalid_json",
-			req: wantReq{
-				body:   `{"account_id":101,`,
-				header: map[string]string{"Content-Type": "application/json"},
-			},
-			want: wantResp{
-				code: http.StatusBadRequest,
-				body: `{"error":"invalid json"}`,
-			},
-		},
-		{
-			name: "03_Wrong_fields",
-			req: wantReq{
-				body:   `{"acc_id":101,"ttl":"x"}`,
-				header: map[string]string{"Content-Type": "application/json"},
-			},
-			want: wantResp{
-				code: http.StatusBadRequest,
-				body: `{"error":"invalid json"}`,
-			},
-		},
-		{
-			name: "04_Invalid_id",
-			req: wantReq{
-				body:   `{"account_id":0,"title":"x","body":"y"}`,
-				header: map[string]string{"Content-Type": "application/json"},
-			},
-			want: wantResp{
-				code: http.StatusBadRequest,
-				body: `{"error":"invalid content of fields"}`,
-			},
-		},
-		{
-			name: "05_Get_existing_note",
-			req: wantReq{
-				body:   `{"account_id":101,"id":1}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body: `{"account_id":101,"id":1}`,
 			},
 			want: wantResp{
 				code: http.StatusOK,
-				body: `{"id":1,"account_id":101,"title":"Первый след когтей",
-"body":"Бруня оставил заметку прямо на дверце — когтями. Данные для теста GET.",
+				body: `{"id":1,"account_id":101,"title":"get-visible-note",
+"body":"Fixture used by the GET note test.",
 "created_at":"2025-08-12T08:00:00Z","updated_at":"2025-08-12T08:15:00Z"}`,
 			},
 		},
 		{
-			name: "06_Get_non-existing_note",
+			name: "#02_INVALID_JSON",
 			req: wantReq{
-				body:   `{"account_id":101,"id":99999}`,
-				header: map[string]string{"Content-Type": "application/json"},
+				body: `{"account_id":101,`,
+			},
+			want: wantResp{
+				code: http.StatusUnprocessableEntity,
+				body: `{"error":"invalid json"}`,
+			},
+		},
+		{
+			name: "#03_BAD_FIELDS",
+			req: wantReq{
+				body: `{"acc_id":101,"ttl":"x"}`,
+			},
+			want: wantResp{
+				code: http.StatusUnprocessableEntity,
+				body: `{"error":"invalid json"}`,
+			},
+		},
+		{
+			name: "#04_INVALID_IDS",
+			req: wantReq{
+				body: `{"account_id":0,"id":0}`,
+			},
+			want: wantResp{
+				code: http.StatusBadRequest,
+				body: `{"error":"bad request"}`,
+			},
+		},
+		{
+			name: "#05_GET_NOT_EXISTING",
+			req: wantReq{
+				body: `{"account_id":101,"id":99999}`,
 			},
 			want: wantResp{
 				code: http.StatusNotFound,
-				body: `{"error":"note not found"}`,
+				body: `{"error":"not found"}`,
 			},
 		},
 	}
@@ -107,14 +90,9 @@ func TestHTTPGetNoteHandler(t *testing.T) {
 			req := httptest.NewRequest(method, url, strings.NewReader(tt.req.body))
 			rr := httptest.NewRecorder()
 
-			for k, v := range tt.req.header {
-				req.Header.Set(k, v)
-			}
-
 			sut.ServeHTTP(rr, req)
 			assert.Equal(t, tt.want.code, rr.Code, "status code")
-			assert.Equal(t, normalizeJSON(t, tt.want.body), normalizeJSON(t, rr.Body.String()))
-
+			assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body), testutil.NormalizeJSON(t, rr.Body.String()))
 		})
 	}
 }

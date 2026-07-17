@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/url"
+	"notes/internal/pkg/kit"
 	"os"
 	"strconv"
 	"strings"
@@ -129,15 +130,8 @@ func GetAppConfig() (*AppConfig, error) {
 		return nil, fmt.Errorf("GetAppConfig: %w", err)
 	}
 
-	if err := v.Struct(config); err != nil {
-		if errs, ok := err.(validator.ValidationErrors); ok {
-			var b strings.Builder
-			for _, e := range errs {
-				fmt.Fprintf(&b, "%s failed on '%s'\n", e.Namespace(), e.Tag())
-			}
-			return nil, fmt.Errorf("GetAppConfig: \n %s", b.String())
-		}
-		return nil, fmt.Errorf("GetAppConfig: %w", err)
+	if err := kit.ValidateStruct(v, config); err != nil {
+		return nil, fmt.Errorf("validate config: %w", err)
 	}
 
 	return config, nil

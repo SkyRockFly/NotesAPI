@@ -1,35 +1,35 @@
 package httpserver
 
 import (
+	"fmt"
 	"net/http"
 	noteservice "notes/internal/notes-svc/noteService"
 )
+
+type GetDTO struct {
+	ID        int64 `json:"id"`
+	AccountID int   `json:"account_id"`
+}
 
 func HTTPGetNoteHandler(service *noteservice.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		logger := getCtxLogger(ctx)
 
-		noteDTO, err := parseJSON(r)
-		if err != nil {
-			logger.
-				Warn().
-				Str("parse", "invalid json")
-			writeJSON(w, http.StatusBadRequest,
-				logger, errorAPIResponse{Err: "invalid json"})
+		var dto DeleteDTO
+		if err := decodeJSON(&dto, r); err != nil {
+			handleError(w, fmt.Errorf("decode:%w", err), logger)
 			return
 		}
-		note := remapDTOtoSVC(noteDTO)
 
-		servNote, err := service.Get(ctx, note)
+		getReq := noteservice.GetReq{
+			ID:        dto.ID,
+			AccountID: dto.AccountID,
+		}
+
+		servNote, err := service.Get(ctx, getReq)
 		if err != nil {
-			code, info := mapToHTTPError(err, logger)
-			logger.
-				Warn().
-				Err(err).
-				Msg("service error")
-			writeJSON(w, code,
-				logger, info)
+			handleError(w, fmt.Errorf("svc.Get:%w", err), logger)
 			return
 		}
 		newNote := remapSVCToResp(servNote)

@@ -3,42 +3,45 @@ package httpserver
 import (
 	"fmt"
 	"net/http"
-	userservice "notes/internal/gateway/userService"
+	notesvc "notes/internal/gateway/service/note"
+	"notes/internal/pkg/middlewares"
 )
 
 type createDTO struct {
-	AccountID int    `json:"account_id"`
-	Title     string `json:"title"`
-	Body      string `json:"body"`
+	Title string `json:"title"`
+	Body  string `json:"body"`
 }
 
 type createResponse struct {
-	ID int `json:"id"`
+	ID int64 `json:"id"`
 }
 
-func createNoteHandler(service *userservice.Service) http.HandlerFunc {
+func createNoteHandler(service *notesvc.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		ctx := r.Context()
 		logger := getCtxLogger(ctx)
 
-		dtoNote, err := decodeJSON[createDTO](r)
-		if err != nil {
-			logger.Info().Err(fmt.Errorf("decode: %w", err)).Msg("create handler")
-			writeJSON(w, http.StatusBadRequest, logger, errorAPIResponse{Err: "invalid json"})
+		var dtoNote createDTO
+		if err := decodeJSON(&dtoNote, r); err != nil {
+			handleError(w, fmt.Errorf("decode:%w", err), logger)
 			return
 		}
 
-		note := userservice.CreateNoteData{
-			AccountID: dtoNote.AccountID,
+		uid, ok := ctx.Value(middlewares.UIDKey).(int)
+		if !ok {
+			handleError(w, fmt.Errorf("cant extract ctx value"), logger)
+			return
+		}
+
+		note := notesvc.CreateReq{
+			AccountID: uid,
 			Title:     dtoNote.Title,
 			Body:      dtoNote.Body,
 		}
 
 		id, err := service.Create(ctx, note)
 		if err != nil {
-			code, desc := mapToHTTPError(err, logger, "create handler")
-			writeJSON(w, code, logger, errorAPIResponse{Err: desc})
+			handleError(w, fmt.Errorf("svc.create: %w", err), logger)
 			return
 		}
 

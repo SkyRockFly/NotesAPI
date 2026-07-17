@@ -1,12 +1,14 @@
 package httpserver
 
 import (
+	"fmt"
 	"net/http"
 	noteservice "notes/internal/notes-svc/noteService"
 )
 
-type DeleteNoteResp struct {
-	Deleted bool `json:"deleted"`
+type DeleteDTO struct {
+	ID        int64 `json:"id"`
+	AccountID int   `json:"account_id"`
 }
 
 func HTTPDeleteNoteHandler(service *noteservice.Service) http.HandlerFunc {
@@ -14,28 +16,21 @@ func HTTPDeleteNoteHandler(service *noteservice.Service) http.HandlerFunc {
 		ctx := r.Context()
 		logger := getCtxLogger(ctx)
 
-		noteDTO, err := parseJSON(r)
-		if err != nil {
-			logger.
-				Warn().
-				Str("parse", "invalid json")
-			writeJSON(w, http.StatusBadRequest,
-				logger, errorAPIResponse{Err: "invalid json"})
+		var dto DeleteDTO
+		if err := decodeJSON(&dto, r); err != nil {
+			handleError(w, fmt.Errorf("decode:%w", err), logger)
 			return
 		}
 
-		note := remapDTOtoSVC(noteDTO)
-		if err := service.Delete(ctx, note); err != nil {
-			code, info := mapToHTTPError(err, logger)
-			logger.
-				Warn().
-				Err(err).
-				Msg("service error")
-			writeJSON(w, code,
-				logger, info)
+		deleteReq := noteservice.DeleteReq{
+			ID:        dto.ID,
+			AccountID: dto.AccountID,
+		}
+		if err := service.Delete(ctx, deleteReq); err != nil {
+			handleError(w, fmt.Errorf("svc.Delete:%w", err), logger)
 			return
 		}
 
-		writeJSON(w, http.StatusOK, logger, DeleteNoteResp{Deleted: true})
+		writeJSON(w, http.StatusNoContent, logger, nil)
 	}
 }

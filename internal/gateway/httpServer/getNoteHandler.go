@@ -3,35 +3,39 @@ package httpserver
 import (
 	"fmt"
 	"net/http"
-	userservice "notes/internal/gateway/userService"
+	notesvc "notes/internal/gateway/service/note"
+	"notes/internal/pkg/middlewares"
 )
 
 type getDTO struct {
-	ID        int `json:"id"`
-	AccountID int `json:"account_id"`
+	ID int64 `json:"id"`
 }
 
-func getNoteHandler(service *userservice.Service) http.HandlerFunc {
+func getNoteHandler(service *notesvc.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		logger := getCtxLogger(ctx)
 
-		dtoNote, err := decodeJSON[getDTO](r)
-		if err != nil {
-			logger.Info().Err(fmt.Errorf("decode: %w", err)).Msg("get handler")
-			writeJSON(w, http.StatusBadRequest, logger, errorAPIResponse{Err: "invalid json"})
+		var dtoNote getDTO
+		if err := decodeJSON(&dtoNote, r); err != nil {
+			handleError(w, fmt.Errorf("decode: %w", err), logger)
 			return
 		}
 
-		note := userservice.GetNoteData{
+		uid, ok := ctx.Value(middlewares.UIDKey).(int)
+		if !ok {
+			handleError(w, fmt.Errorf("can't extract uid value"), logger)
+			return
+		}
+
+		note := notesvc.GetReq{
 			ID:        dtoNote.ID,
-			AccountID: dtoNote.AccountID,
+			AccountID: uid,
 		}
 
 		svcNote, err := service.Get(ctx, note)
 		if err != nil {
-			code, desc := mapToHTTPError(err, logger, "get handler")
-			writeJSON(w, code, logger, errorAPIResponse{Err: desc})
+			handleError(w, fmt.Errorf("svc.get: %w", err), logger)
 			return
 		}
 

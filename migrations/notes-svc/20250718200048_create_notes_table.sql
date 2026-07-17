@@ -1,6 +1,5 @@
 -- +goose Up
 -- +goose StatementBegin
-SELECT 'up SQL query';
 CREATE TABLE note (
   id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   account_id INT NOT NULL,                           

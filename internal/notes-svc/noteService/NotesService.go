@@ -2,29 +2,22 @@ package noteservice
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	noterepository "notes/internal/notes-svc/noteRepository"
-	"strings"
+	"notes/internal/pkg/apperror"
+	"notes/internal/pkg/kit"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 )
 
-var ErrInvalid = errors.New("invalid") // 400
-
-type IRepository interface {
-	Create(ctx context.Context, accountID int, title string, body string) (int, error)
-	Delete(ctx context.Context, id, accountID int) error
-	Get(ctx context.Context, id, accountID int) (noterepository.Note, error)
-	List(ctx context.Context, accountID int) ([]noterepository.Note, error)
-	Update(ctx context.Context, title, body string, id, accountID int) error
-}
-
 type Service struct {
-	repo IRepository
+	repo     noterepository.IRepository
+	validate *validator.Validate
 }
 
 type Note struct {
-	ID        int
+	ID        int64
 	AccountID int
 	Title     string
 	Body      string
@@ -33,54 +26,95 @@ type Note struct {
 	DeletedAt time.Time
 }
 
-// t, _ := time.Parse(time.DateTime, "")
-//	t.IsZero()
-
-func NewService(repo IRepository) *Service {
-	return &Service{repo: repo}
+type ListReq struct {
+	AccountID int   `validate:"min=1"`
+	Limit     int   `validate:"min=1"`
+	Cursor    int64 `validate:"min=0"`
+	Next      bool
 }
 
-func (s *Service) Create(ctx context.Context, note Note) (int, error) {
-	if note.AccountID < 1 {
-		return 0, fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
+type ListResp struct {
+	CursorNext int64
+	CursorPrev int64
+	Notes      []Note
+	HasMore    bool
+}
+
+type GetReq struct {
+	ID        int64 `validate:"min=1"`
+	AccountID int   `validate:"min=1"`
+}
+
+type CreateReq struct {
+	AccountID int    `validate:"min=1"`
+	Title     string `validate:"required,max=255"`
+	Body      string `validate:"required"`
+}
+
+type DeleteReq struct {
+	ID        int64 `validate:"min=1"`
+	AccountID int   `validate:"min=1"`
+}
+
+type UpdateReq struct {
+	ID        int64  `validate:"min=1"`
+	AccountID int    `validate:"min=1"`
+	Title     string `validate:"required,max=255"`
+	Body      string
+}
+
+func NewService(repo noterepository.IRepository) *Service {
+	return &Service{
+		repo:     repo,
+		validate: initValidator(),
 	}
-	if strings.TrimSpace(note.Title) == "" {
-		return 0, fmt.Errorf("%w: no title", ErrInvalid)
-	}
-	if len(note.Title) > 255 {
-		return 0, fmt.Errorf("%w: the length of title is more than 255 symbols", ErrInvalid)
+}
+
+func (s *Service) Create(ctx context.Context, req CreateReq) (int, error) {
+	if err := kit.ValidateStruct(s.validate, req); err != nil {
+		return 0, fmt.Errorf("%w : validate struct: %w", apperror.ErrBadRequest, err)
 	}
 
-	id, err := s.repo.Create(ctx, note.AccountID, note.Title, note.Body)
+	createReq := noterepository.CreateReq{
+		AccountID: req.AccountID,
+		Title:     req.Title,
+		Body:      req.Body,
+	}
+
+	id, err := s.repo.Create(ctx, createReq)
 	if err != nil {
 		return 0, fmt.Errorf("noteRepo.Create: %w", err)
 	}
 	return id, nil
 }
 
-func (s *Service) Delete(ctx context.Context, note Note) error {
-	if note.ID < 1 {
-		return fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
-	}
-	if note.AccountID < 1 {
-		return fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
+func (s *Service) Delete(ctx context.Context, req DeleteReq) error {
+	if err := kit.ValidateStruct(s.validate, req); err != nil {
+		return fmt.Errorf("%w : validate struct: %w", apperror.ErrBadRequest, err)
 	}
 
-	if err := s.repo.Delete(ctx, note.ID, note.AccountID); err != nil {
+	deleteReq := noterepository.DeleteReq{
+		AccountID: req.AccountID,
+		ID:        req.ID,
+	}
+
+	if err := s.repo.Delete(ctx, deleteReq); err != nil {
 		return fmt.Errorf("noteService.Delete:%w", err)
 	}
 	return nil
 }
 
-func (s *Service) Get(ctx context.Context, note Note) (Note, error) {
-	if note.ID < 1 {
-		return Note{}, fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
-	}
-	if note.AccountID < 1 {
-		return Note{}, fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
+func (s *Service) Get(ctx context.Context, req GetReq) (Note, error) {
+	if err := kit.ValidateStruct(s.validate, req); err != nil {
+		return Note{}, fmt.Errorf("%w : validate struct: %w", apperror.ErrBadRequest, err)
 	}
 
-	noteRepo, err := s.repo.Get(ctx, note.ID, note.AccountID)
+	getReq := noterepository.GetReq{
+		AccountID: req.AccountID,
+		ID:        req.ID,
+	}
+
+	noteRepo, err := s.repo.Get(ctx, getReq)
 	if err != nil {
 		return Note{}, fmt.Errorf("noteService.Get:%w", err)
 	}
@@ -89,39 +123,51 @@ func (s *Service) Get(ctx context.Context, note Note) (Note, error) {
 	return noteServ, nil
 }
 
-func (s *Service) List(ctx context.Context, note Note) ([]Note, error) {
-	if note.AccountID < 1 {
-		return []Note{}, fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
-	}
-	notes, err := s.repo.List(ctx, note.AccountID)
-	if err != nil {
-		return []Note{}, fmt.Errorf("notesService.List:%w", err)
+func (s *Service) List(ctx context.Context, req ListReq) (ListResp, error) {
+	if err := kit.ValidateStruct(s.validate, req); err != nil {
+		return ListResp{}, fmt.Errorf("%w : validate struct: %w", apperror.ErrBadRequest, err)
 	}
 
-	servNotes := make([]Note, 0, len(notes))
-	for _, noteRepo := range notes {
+	listReq := noterepository.ListReq{
+		AccountID: req.AccountID,
+		Limit:     req.Limit,
+		Cursor:    req.Cursor,
+		Next:      req.Next,
+	}
+	repoResp, err := s.repo.List(ctx, listReq)
+	if err != nil {
+		return ListResp{}, fmt.Errorf("notesService.List:%w", err)
+	}
+
+	servNotes := make([]Note, 0, len(repoResp.Notes))
+	for _, noteRepo := range repoResp.Notes {
 		note := repoToSVC(noteRepo)
 		servNotes = append(servNotes, note)
 	}
 
-	return servNotes, nil
+	resp := ListResp{
+		CursorNext: repoResp.CursorNext,
+		CursorPrev: repoResp.CursorPrev,
+		HasMore:    repoResp.HasMore,
+		Notes:      servNotes,
+	}
+
+	return resp, nil
 }
 
-func (s *Service) Update(ctx context.Context, note Note) error {
-	if note.ID < 1 {
-		return fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
-	}
-	if note.AccountID < 1 {
-		return fmt.Errorf("%w: ID cannot be less than 1", ErrInvalid)
-	}
-	if strings.TrimSpace(note.Title) == "" {
-		return fmt.Errorf("%w: no title", ErrInvalid)
-	}
-	if len(note.Title) > 255 {
-		return fmt.Errorf("%w: the length of title is more than 255 symbols", ErrInvalid)
+func (s *Service) Update(ctx context.Context, req UpdateReq) error {
+	if err := kit.ValidateStruct(s.validate, req); err != nil {
+		return fmt.Errorf("%w : validate struct: %w", apperror.ErrBadRequest, err)
 	}
 
-	if err := s.repo.Update(ctx, note.Title, note.Body, note.ID, note.AccountID); err != nil {
+	updateReq := noterepository.UpdateReq{
+		ID:        req.ID,
+		AccountID: req.AccountID,
+		Title:     req.Title,
+		Body:      req.Body,
+	}
+
+	if err := s.repo.Update(ctx, updateReq); err != nil {
 		return fmt.Errorf("notesService.Update:%w", err)
 	}
 	return nil
@@ -137,4 +183,22 @@ func repoToSVC(noteRepo noterepository.Note) Note {
 		UpdatedAt: noteRepo.UpdatedAt,
 	}
 	return note
+}
+
+func initValidator() *validator.Validate {
+	v := validator.New()
+
+	v.RegisterStructValidation(validateListImagesReq, ListReq{})
+
+	return v
+}
+
+func validateListImagesReq(sl validator.StructLevel) {
+	req := sl.Current().Interface().(ListReq)
+
+	hasId := req.Cursor > 0
+
+	if !req.Next && !hasId {
+		sl.ReportError(req.Next, "Next", "next", "cursorpair", "")
+	}
 }
