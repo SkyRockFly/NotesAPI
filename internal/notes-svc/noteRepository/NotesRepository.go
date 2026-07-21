@@ -6,7 +6,7 @@ import (
 )
 
 type Note struct {
-	ID        int64     `db:"id"`
+	ID        int       `db:"id"`
 	AccountID int       `db:"account_id"`
 	Title     string    `db:"title"`
 	Body      string    `db:"body"`
@@ -18,19 +18,19 @@ type Note struct {
 type ListReq struct {
 	AccountID int
 	Limit     int
-	Cursor    int64
+	Cursor    int
 	Next      bool
 }
 
 type ListResp struct {
-	CursorNext int64
-	CursorPrev int64
+	CursorNext int
+	CursorPrev int
 	Notes      []Note
 	HasMore    bool
 }
 
 type GetReq struct {
-	ID        int64
+	ID        int
 	AccountID int
 }
 
@@ -41,12 +41,12 @@ type CreateReq struct {
 }
 
 type DeleteReq struct {
-	ID        int64
+	ID        int
 	AccountID int
 }
 
 type UpdateReq struct {
-	ID        int64
+	ID        int
 	AccountID int
 	Title     string
 	Body      string

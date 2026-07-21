@@ -195,6 +195,6 @@ func parseRefresh(refresh string) (string, []byte, error) {
 	return parts[0], raw, nil
 }
 
-func (k refreshKey) pairKeys() string { // String
+func (k refreshKey) pairKeys() string {
 	return k.selector + "." + base64.RawURLEncoding.EncodeToString(k.private)
 }

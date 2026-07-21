@@ -35,7 +35,7 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			},
 			want: wantResp{
 				code: http.StatusCreated,
-				body: `{"id":6}`,
+				body: `{"id":5}`,
 			},
 		},
 		{
@@ -90,7 +90,7 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 
 			sut.ServeHTTP(rr, req)
 			assert.Equal(t, tt.want.code, rr.Code, "status code")
-			assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body), testutil.NormalizeJSON(t, tt.want.body))
+			assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body), testutil.NormalizeJSON(t, rr.Body.String()))
 		})
 	}
 }

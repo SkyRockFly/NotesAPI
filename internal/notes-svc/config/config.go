@@ -101,7 +101,9 @@ type AppConfig struct {
 }
 
 type ServerConfig struct {
-	Port string `yaml:"port" validate:"required,port"`
+	Port       string `yaml:"port" validate:"required,port"`
+	HealthPort string `yaml:"health_port" validate:"required,port"`
+	IsGRPC     bool   `yaml:"is_grpc"`
 }
 
 type DBConfig struct {

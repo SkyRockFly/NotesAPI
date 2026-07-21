@@ -7,7 +7,7 @@ import (
 )
 
 type UpdateDTO struct {
-	ID        int64  `json:"id"`
+	ID        int    `json:"id"`
 	AccountID int    `json:"account_id"`
 	Title     string `json:"title"`
 	Body      string `json:"body"`

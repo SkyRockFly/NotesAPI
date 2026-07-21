@@ -1,5 +1,7 @@
 server:
+  is_grpc: true
   port: "5681"
+  health_port: "5685"
 db:
   url: "postgres://postgres:bear@db-notessvc:5432/notedb"
 logger:

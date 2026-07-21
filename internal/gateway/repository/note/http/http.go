@@ -23,7 +23,7 @@ type SvcHTTPCfg struct {
 }
 
 type CreateResp struct {
-	ID int64 `json:"id"`
+	ID int `json:"id"`
 }
 
 func NewHTTPRepo(cfg SvcHTTPCfg) *HTTPRepo {
@@ -62,7 +62,7 @@ func (s *HTTPRepo) Get(ctx context.Context, req noterepo.GetReq) (noterepo.Note,
 	return note, nil
 }
 
-func (s *HTTPRepo) Create(ctx context.Context, req noterepo.CreateReq) (int64, error) {
+func (s *HTTPRepo) Create(ctx context.Context, req noterepo.CreateReq) (int, error) {
 	reqURL, err := url.JoinPath(s.baseURL, "note/create")
 	if err != nil {
 		return 0, fmt.Errorf("create url: %w", err)

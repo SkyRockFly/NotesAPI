@@ -7,15 +7,15 @@ import (
 )
 
 type ListDTO struct {
-	AccountID int   `json:"account_id"`
-	Limit     int   `json:"limit"`
-	Cursor    int64 `json:"cursor"`
-	Next      bool  `json:"next"`
+	AccountID int  `json:"account_id"`
+	Limit     int  `json:"limit"`
+	Cursor    int  `json:"cursor"`
+	Next      bool `json:"next"`
 }
 
 type ListResp struct {
-	CursorNext int64          `json:"cursor_next"`
-	CursorPrev int64          `json:"cursor_prev"`
+	CursorNext int            `json:"cursor_next"`
+	CursorPrev int            `json:"cursor_prev"`
 	Notes      []NoteResponse `json:"notes"`
 	HasMore    bool           `json:"has_more"`
 }
