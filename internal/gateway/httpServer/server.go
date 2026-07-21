@@ -36,7 +36,7 @@ type healthResponse struct {
 }
 
 type ResponseNote struct {
-	ID        int64     `json:"id"`
+	ID        int       `json:"id"`
 	AccountID int       `json:"account_id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
@@ -78,26 +78,26 @@ func StartServer(ctx context.Context, opts ServerOpts) error {
 
 	mux.HandleFunc("POST /auth/signup", Pipe(
 		signUpHandler(opts.SVCauth),
-		middlewares.DemandJSONHeaders,
-		middlewares.JSONReqSizeMiddleware,
 		middlewares.LogMiddleware,
 		rlAuth.RateLimitMiddleware,
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
 	))
 
 	mux.HandleFunc("POST /auth/signin", Pipe(
 		signInHandler(opts.SVCauth),
-		middlewares.DemandJSONHeaders,
-		middlewares.JSONReqSizeMiddleware,
 		middlewares.LogMiddleware,
 		rlAuth.RateLimitMiddleware,
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
 	))
 
 	mux.HandleFunc("POST /auth/refresh", Pipe(
 		refreshHandler(opts.SVCauth),
-		middlewares.DemandJSONHeaders,
-		middlewares.JSONReqSizeMiddleware,
 		middlewares.LogMiddleware,
 		rlAuth.RateLimitMiddleware,
+		middlewares.DemandJSONHeaders,
+		middlewares.JSONReqSizeMiddleware,
 	))
 
 	rlUID, err := middlewares.NewRateLimiter(ctx, getUIDKey, opts.RateLimiterCfg)
@@ -107,47 +107,47 @@ func StartServer(ctx context.Context, opts ServerOpts) error {
 
 	mux.HandleFunc("POST /note/get", Pipe(
 		getNoteHandler(opts.SVCnotes),
+		middlewares.LogMiddleware,
+		authMW,
+		rlUID.RateLimitMiddleware,
 		middlewares.DemandJSONHeaders,
 		middlewares.JSONReqSizeMiddleware,
-		rlUID.RateLimitMiddleware,
-		authMW,
-		middlewares.LogMiddleware,
 	))
 
 	mux.HandleFunc("DELETE /note/delete", Pipe(
 		deleteNoteHandler(opts.SVCnotes),
+		middlewares.LogMiddleware,
+		authMW,
+		rlUID.RateLimitMiddleware,
 		middlewares.DemandJSONHeaders,
 		middlewares.JSONReqSizeMiddleware,
-		rlUID.RateLimitMiddleware,
-		authMW,
-		middlewares.LogMiddleware,
 	))
 
 	mux.HandleFunc("POST /note/list", Pipe(
 		listNoteHandler(opts.SVCnotes),
+		middlewares.LogMiddleware,
+		authMW,
+		rlUID.RateLimitMiddleware,
 		middlewares.DemandJSONHeaders,
 		middlewares.JSONReqSizeMiddleware,
-		rlUID.RateLimitMiddleware,
-		authMW,
-		middlewares.LogMiddleware,
 	))
 
 	mux.HandleFunc("PUT /note/update", Pipe(
 		updateNoteHandler(opts.SVCnotes),
+		middlewares.LogMiddleware,
+		authMW,
+		rlUID.RateLimitMiddleware,
 		middlewares.DemandJSONHeaders,
 		middlewares.JSONReqSizeMiddleware,
-		rlUID.RateLimitMiddleware,
-		authMW,
-		middlewares.LogMiddleware,
 	))
 
 	mux.HandleFunc("POST /note/create", Pipe(
 		createNoteHandler(opts.SVCnotes),
+		middlewares.LogMiddleware,
+		authMW,
+		rlUID.RateLimitMiddleware,
 		middlewares.DemandJSONHeaders,
 		middlewares.JSONReqSizeMiddleware,
-		rlUID.RateLimitMiddleware,
-		authMW,
-		middlewares.LogMiddleware,
 	))
 
 	server := &http.Server{
@@ -301,8 +301,9 @@ func handleError(w http.ResponseWriter, err error, log *zerolog.Logger) {
 	}
 
 	log.WithLevel(level).
-		Err(fmt.Errorf("response: %w", err)).
+		Err(err).
 		Msg("request failed")
+
 	writeJSON(w, code, log, resp)
 }
 

@@ -8,7 +8,7 @@ import (
 )
 
 type updateDTO struct {
-	ID    int64  `json:"ID"`
+	ID    int    `json:"ID"`
 	Title string `json:"title"`
 	Body  string `json:"body"`
 }

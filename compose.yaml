@@ -66,10 +66,11 @@ services:
           condition: service_completed_successfully
       ports:
         - "5681:5681"
+        - "5685:5685"
       volumes:
         -  ./config/notes-svc/config.yaml:/app/configs/config.yaml:ro
       healthcheck:
-         test: ["CMD-SHELL", "wget -qO- --spider http://localhost:5681/health || exit 1"]
+         test: ["CMD-SHELL", "wget -qO- --spider http://localhost:5685/health || exit 1"]
          interval: 5s
          timeout: 3s
          retries: 10

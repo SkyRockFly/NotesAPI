@@ -17,7 +17,7 @@ type Service struct {
 }
 
 type Note struct {
-	ID        int64
+	ID        int
 	AccountID int
 	Title     string
 	Body      string
@@ -27,22 +27,22 @@ type Note struct {
 }
 
 type ListReq struct {
-	AccountID int   `validate:"min=1"`
-	Limit     int   `validate:"min=1"`
-	Cursor    int64 `validate:"min=0"`
+	AccountID int `validate:"min=1"`
+	Limit     int `validate:"min=1"`
+	Cursor    int `validate:"min=0"`
 	Next      bool
 }
 
 type ListResp struct {
-	CursorNext int64
-	CursorPrev int64
+	CursorNext int
+	CursorPrev int
 	Notes      []Note
 	HasMore    bool
 }
 
 type GetReq struct {
-	ID        int64 `validate:"min=1"`
-	AccountID int   `validate:"min=1"`
+	ID        int `validate:"min=1"`
+	AccountID int `validate:"min=1"`
 }
 
 type CreateReq struct {
@@ -52,12 +52,12 @@ type CreateReq struct {
 }
 
 type DeleteReq struct {
-	ID        int64 `validate:"min=1"`
-	AccountID int   `validate:"min=1"`
+	ID        int `validate:"min=1"`
+	AccountID int `validate:"min=1"`
 }
 
 type UpdateReq struct {
-	ID        int64  `validate:"min=1"`
+	ID        int    `validate:"min=1"`
 	AccountID int    `validate:"min=1"`
 	Title     string `validate:"required,max=255"`
 	Body      string

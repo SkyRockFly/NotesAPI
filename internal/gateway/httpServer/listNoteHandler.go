@@ -8,14 +8,14 @@ import (
 )
 
 type ListDTO struct {
-	Cursor int64 `json:"cursor"`
-	Limit  int   `json:"limit"`
-	Next   bool  `json:"next"`
+	Cursor int  `json:"cursor"`
+	Limit  int  `json:"limit"`
+	Next   bool `json:"next"`
 }
 
 type ListResp struct {
-	CursorNext int64          `json:"cursor_next"`
-	CursorPrev int64          `json:"cursor_prev"`
+	CursorNext int            `json:"cursor_next"`
+	CursorPrev int            `json:"cursor_prev"`
 	Notes      []ResponseNote `json:"notes"`
 	HasMore    bool           `json:"has_more"`
 }

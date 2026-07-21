@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"notes/internal/notes-svc/config"
+	grpcserver "notes/internal/notes-svc/gRPCServer"
 	noterepository "notes/internal/notes-svc/noteRepository"
 	noteservice "notes/internal/notes-svc/noteService"
 	"notes/internal/pkg/applogger"
@@ -14,6 +15,7 @@ import (
 	httpserver "notes/internal/notes-svc/httpServer"
 
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -39,8 +41,26 @@ func main() {
 	repo := noterepository.NewPostgres(pool)
 	service := noteservice.NewService(repo)
 
-	if err := httpserver.StartServer(ctx, appConfig.Server.Port, service); err != nil {
-		log.Panic().Err(fmt.Errorf("server: %w", err)).Msg("start app")
+	if appConfig.Server.IsGRPC {
+		errs, eCtx := errgroup.WithContext(ctx)
+		errs.Go(func() error {
+			return grpcserver.StartServer(eCtx, appConfig.Server.Port, service)
+		})
+
+		errs.Go(func() error {
+			return httpserver.StartHealthServer(ctx, appConfig.Server.HealthPort)
+		})
+
+		if err := errs.Wait(); err != nil {
+			log.Panic().
+				Err(fmt.Errorf("server: %w", err)).
+				Msg("start app")
+		}
+	} else {
+		if err := httpserver.StartServer(ctx, appConfig.Server.Port, service); err != nil {
+			log.Panic().Err(fmt.Errorf("http server: %w", err)).Msg("start app")
+		}
 	}
+
 	log.Info().Msg("server stopped gracefully")
 }

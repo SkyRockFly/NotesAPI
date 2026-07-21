@@ -4,13 +4,16 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	notesvc "notes/internal/gateway/service/note"
+	noterepo "notes/internal/gateway/repository/note"
+	notegrpc "notes/internal/gateway/repository/note/grpc"
+	userservice "notes/internal/gateway/service/note"
 	"notes/internal/pkg/middlewares"
 	"notes/internal/pkg/testutil"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_getNoteHandler(t *testing.T) {
@@ -107,26 +110,52 @@ func Test_getNoteHandler(t *testing.T) {
 		},
 	}
 
-	repo := newTestRepo(t)
-	svc := notesvc.NewService(repo)
+	repos := []struct {
+		name string
+		repo noterepo.INote
+	}{
+		{
+			name: "http",
+			repo: newTestRepo(t),
+		},
+	}
 
-	sut := middlewares.LogMiddleware(getNoteHandler(svc))
+	address := newTestGRPCServer(t)
+	client, conn, err := makeGRPCClient(address)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		conn.Close()
+	})
+
+	repos = append(repos, struct {
+		name string
+		repo noterepo.INote
+	}{
+		name: "grpc",
+		repo: notegrpc.NewRepo(client),
+	})
 
 	method := http.MethodPost
 	hndURL := "/note/get"
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(method, hndURL, strings.NewReader(tt.req.body))
+	for _, repo := range repos {
+		t.Run(repo.name, func(t *testing.T) {
+			svc := userservice.NewService(repo.repo)
+			sut := middlewares.LogMiddleware(getNoteHandler(svc))
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					req := httptest.NewRequest(method, hndURL, strings.NewReader(tt.req.body))
 
-			rr := httptest.NewRecorder()
-			idCtx := context.WithValue(req.Context(), middlewares.UIDKey, tt.req.ctxID)
+					rr := httptest.NewRecorder()
+					idCtx := context.WithValue(req.Context(), middlewares.UIDKey, tt.req.ctxID)
 
-			sut.ServeHTTP(rr, req.WithContext(idCtx))
+					sut.ServeHTTP(rr, req.WithContext(idCtx))
 
-			assert.Equal(t, tt.want.code, rr.Code)
-			assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body),
-				testutil.NormalizeJSON(t, rr.Body.String()))
+					assert.Equal(t, tt.want.code, rr.Code)
+					assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body),
+						testutil.NormalizeJSON(t, rr.Body.String()))
+				})
+			}
 		})
 	}
 }

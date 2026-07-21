@@ -21,7 +21,7 @@ type Service struct {
 }
 
 type Note struct {
-	ID        int64
+	ID        int
 	AccountID int
 	Title     string
 	Body      string
@@ -36,34 +36,34 @@ type CreateReq struct {
 }
 
 type UpdateReq struct {
-	ID        int64  `validate:"min=1"`
+	ID        int    `validate:"min=1"`
 	AccountID int    `validate:"min=1"`
 	Title     string `validate:"required,max=255"`
 	Body      string `validate:"required"`
 }
 
 type ListReq struct {
-	AccountID int   `validate:"min=1"`
-	Limit     int   `validate:"min=1"`
-	Cursor    int64 `validate:"min=0"`
+	AccountID int `validate:"min=1"`
+	Limit     int `validate:"min=1"`
+	Cursor    int `validate:"min=0"`
 	Next      bool
 }
 
 type ListResp struct {
-	CursorNext int64
-	CursorPrev int64
+	CursorNext int
+	CursorPrev int
 	Notes      []Note
 	HasMore    bool
 }
 
 type DeleteReq struct {
-	ID        int64 `validate:"min=1"`
-	AccountID int   `validate:"min=1"`
+	ID        int `validate:"min=1"`
+	AccountID int `validate:"min=1"`
 }
 
 type GetReq struct {
-	ID        int64 `validate:"min=1"`
-	AccountID int   `validate:"min=1"`
+	ID        int `validate:"min=1"`
+	AccountID int `validate:"min=1"`
 }
 
 func NewService(r noterepo.INote) *Service {
@@ -73,7 +73,7 @@ func NewService(r noterepo.INote) *Service {
 	}
 }
 
-func (s *Service) Create(ctx context.Context, req CreateReq) (int64, error) {
+func (s *Service) Create(ctx context.Context, req CreateReq) (int, error) {
 	if err := kit.ValidateStruct(s.validate, req); err != nil {
 		return 0, fmt.Errorf("%w , validate struct: %w", apperror.ErrBadRequest, err)
 	}
@@ -86,7 +86,7 @@ func (s *Service) Create(ctx context.Context, req CreateReq) (int64, error) {
 
 	id, err := s.repo.Create(ctx, createReq)
 	if err != nil {
-		return 0, fmt.Errorf("userNoteRepo.Get: %w", err)
+		return 0, fmt.Errorf("userNoteRepo.Create: %w", err)
 	}
 
 	return id, nil

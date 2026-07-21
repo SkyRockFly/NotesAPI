@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	requestid "notes/internal/pkg/requestID"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,6 +44,11 @@ func LogMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			requestID = uuid.New().String()
 		}
 
+		ctx := requestid.WithContext(
+			r.Context(),
+			requestID,
+		)
+
 		route := r.Pattern
 		if route == "" {
 			route = r.Method + " " + r.URL.Path
@@ -52,11 +58,13 @@ func LogMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		subLogger := log.With().
 			Str("requestID", requestID).
-			Str("route", route).
 			Logger()
 
-		ctx := context.WithValue(
-			r.Context(),
+		subLogger.Info().
+			Str("route", route).Msg("in")
+
+		ctx = context.WithValue(
+			ctx,
 			LoggerCtxKey,
 			subLogger,
 		)

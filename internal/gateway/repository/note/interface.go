@@ -6,7 +6,7 @@ import (
 )
 
 type Note struct {
-	ID        int64     `json:"id"`
+	ID        int       `json:"id"`
 	AccountID int       `json:"account_id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
@@ -15,22 +15,22 @@ type Note struct {
 }
 
 type ListReq struct {
-	AccountID int   `json:"account_id"`
-	Limit     int   `json:"limit"`
-	Cursor    int64 `json:"cursor"`
-	Next      bool  `json:"next"`
+	AccountID int  `json:"account_id"`
+	Limit     int  `json:"limit"`
+	Cursor    int  `json:"cursor"`
+	Next      bool `json:"next"`
 }
 
 type ListResp struct {
-	CursorNext int64  `json:"cursor_next"`
-	CursorPrev int64  `json:"cursor_prev"`
+	CursorNext int    `json:"cursor_next"`
+	CursorPrev int    `json:"cursor_prev"`
 	Notes      []Note `json:"notes"`
 	HasMore    bool   `json:"has_more"`
 }
 
 type GetReq struct {
-	ID        int64 `json:"id"`
-	AccountID int   `json:"account_id"`
+	ID        int `json:"id"`
+	AccountID int `json:"account_id"`
 }
 
 type CreateReq struct {
@@ -40,12 +40,12 @@ type CreateReq struct {
 }
 
 type DeleteReq struct {
-	ID        int64 `json:"id"`
-	AccountID int   `json:"account_id"`
+	ID        int `json:"id"`
+	AccountID int `json:"account_id"`
 }
 
 type UpdateReq struct {
-	ID        int64  `json:"id"`
+	ID        int    `json:"id"`
 	AccountID int    `json:"account_id"`
 	Title     string `json:"title"`
 	Body      string `json:"body"`
@@ -53,7 +53,7 @@ type UpdateReq struct {
 
 type INote interface {
 	Get(ctx context.Context, req GetReq) (Note, error)
-	Create(ctx context.Context, req CreateReq) (int64, error)
+	Create(ctx context.Context, req CreateReq) (int, error)
 	Update(ctx context.Context, req UpdateReq) error
 	List(ctx context.Context, req ListReq) (ListResp, error)
 	Delete(ctx context.Context, req DeleteReq) error

@@ -29,8 +29,9 @@ type ServerConfig struct {
 }
 
 type ConnectionConfig struct {
-	Host string `yaml:"host" validate:"required,hostname|ip"`
-	Port int    `yaml:"port" validate:"required,min=1,max=65535"`
+	IsGRPC bool   `yaml:"is_grpc"`
+	Host   string `yaml:"host" validate:"required,hostname|ip"`
+	Port   int    `yaml:"port" validate:"required,min=1,max=65535"`
 }
 
 type DBConfig struct {

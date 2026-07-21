@@ -3,6 +3,7 @@ server:
 db:
   url: "postgres://postgres:bear@db-gateway:5432/gatewaydb"
 notes-svc:
+  is_grpc: true
   port: 5681
   host: "notes"
 logger:

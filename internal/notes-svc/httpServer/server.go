@@ -34,7 +34,7 @@ type healthResponse struct {
 }
 
 type NoteResponse struct {
-	ID        int64     `json:"id"`
+	ID        int       `json:"id"`
 	AccountID int       `json:"account_id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
@@ -112,6 +112,49 @@ func StartServer(ctx context.Context, port string, service *noteservice.Service)
 	return nil
 }
 
+func StartHealthServer(ctx context.Context, port string) error {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health",
+		middlewares.LogMiddleware(
+			HealthCheckHandler()))
+
+	server := &http.Server{
+		Addr:    ":" + port,
+		Handler: mux,
+	}
+
+	fmt.Print(server.Addr)
+
+	errs, eCtx := errgroup.WithContext(ctx)
+	errs.Go(func() error {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("listenAndServe: %w", err)
+		}
+		return nil
+	})
+
+	<-eCtx.Done()
+	isShuttingDown.Store(true)
+
+	shutdownCtx, done := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer done()
+
+	if err := server.Shutdown(shutdownCtx); err != nil &&
+		!errors.Is(err, http.ErrServerClosed) &&
+		!errors.Is(err, context.Canceled) {
+		if errors.Is(err, context.DeadlineExceeded) {
+			_ = server.Close()
+		}
+		log.Warn().Err(err).Msg("graceful shutdown")
+	}
+
+	if err := errs.Wait(); err != nil {
+		return fmt.Errorf("server: %w", err)
+	}
+	return nil
+}
+
 func HealthCheckHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := getCtxLogger(r.Context())
@@ -122,6 +165,7 @@ func HealthCheckHandler() http.HandlerFunc {
 				Msg("httpServer.healthcheckHandler: shutting down")
 			return
 		}
+		w.WriteHeader(http.StatusOK)
 		resp := &healthResponse{Health: true}
 		err := json.NewEncoder(w).Encode(resp)
 		if err != nil {

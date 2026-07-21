@@ -13,7 +13,7 @@ type createDTO struct {
 }
 
 type createResponse struct {
-	ID int64 `json:"id"`
+	ID int `json:"id"`
 }
 
 func createNoteHandler(service *notesvc.Service) http.HandlerFunc {

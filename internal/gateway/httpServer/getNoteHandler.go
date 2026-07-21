@@ -8,7 +8,7 @@ import (
 )
 
 type getDTO struct {
-	ID int64 `json:"id"`
+	ID int `json:"id"`
 }
 
 func getNoteHandler(service *notesvc.Service) http.HandlerFunc {

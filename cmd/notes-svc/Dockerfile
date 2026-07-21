@@ -5,6 +5,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY internal/pkg ./internal/pkg
+COPY internal/grpc ./internal/grpc
 COPY internal/notes-svc ./internal/notes-svc
 COPY cmd/notes-svc ./cmd/notes-svc
 

@@ -7,8 +7,8 @@ import (
 )
 
 type DeleteDTO struct {
-	ID        int64 `json:"id"`
-	AccountID int   `json:"account_id"`
+	ID        int `json:"id"`
+	AccountID int `json:"account_id"`
 }
 
 func HTTPDeleteNoteHandler(service *noteservice.Service) http.HandlerFunc {

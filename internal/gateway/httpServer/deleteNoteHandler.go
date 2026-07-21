@@ -8,7 +8,7 @@ import (
 )
 
 type deleteDTO struct {
-	ID int64 `json:"id"`
+	ID int `json:"id"`
 }
 
 func deleteNoteHandler(service *notesvc.Service) http.HandlerFunc {
