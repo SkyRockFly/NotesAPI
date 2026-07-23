@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -92,12 +93,10 @@ func StartServer(ctx context.Context, opts ServerOpts) error {
 		middlewares.JSONReqSizeMiddleware,
 	))
 
-	mux.HandleFunc("POST /auth/refresh", Pipe(
+	mux.HandleFunc("GET /auth/refresh", Pipe(
 		refreshHandler(opts.SVCauth),
 		middlewares.LogMiddleware,
 		rlAuth.RateLimitMiddleware,
-		middlewares.DemandJSONHeaders,
-		middlewares.JSONReqSizeMiddleware,
 	))
 
 	rlUID, err := middlewares.NewRateLimiter(ctx, getUIDKey, opts.RateLimiterCfg)
@@ -149,6 +148,9 @@ func StartServer(ctx context.Context, opts ServerOpts) error {
 		middlewares.DemandJSONHeaders,
 		middlewares.JSONReqSizeMiddleware,
 	))
+
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("GET /health", HealthCheckHandler())
 
 	server := &http.Server{
 		Addr:    ":" + strconv.Itoa(opts.Port),

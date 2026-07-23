@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"notes/internal/pkg/testutil"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
@@ -32,8 +32,10 @@ const (
 
 func Test_refreshHandler(t *testing.T) {
 	type wantReq struct {
-		body string
-		mode authBodyMode
+		cookieBody      string
+		cookieExpiresAt time.Time
+		mode            authBodyMode
+		hasCookie       bool
 	}
 	type wantResp struct {
 		code int
@@ -48,8 +50,10 @@ func Test_refreshHandler(t *testing.T) {
 		{
 			name: "#01_OK",
 			req: wantReq{
-				body: `{"refresh":"18f11757-c9cf-47f4-a187-ddfda409abb4.JZO-pIBrPciCvkUdarnkUWzitwphl3rU5P0xFDPHEo4"}`,
-				mode: bodyAccess,
+				cookieBody:      "18f11757-c9cf-47f4-a187-ddfda409abb4.JZO-pIBrPciCvkUdarnkUWzitwphl3rU5P0xFDPHEo4",
+				cookieExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 30),
+				mode:            bodyAccess,
+				hasCookie:       true,
 			},
 			want: wantResp{
 				code: http.StatusOK,
@@ -57,21 +61,11 @@ func Test_refreshHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "#02_BAD_JSON",
+			name: "#02_BAD_REFRESH",
 			req: wantReq{
-				body: `"refres`,
-				mode: bodyRaw,
-			},
-			want: wantResp{
-				code: http.StatusUnprocessableEntity,
-				body: `{"error":"invalid json"}`,
-			},
-		},
-		{
-			name: "#03_BAD_REFRESH",
-			req: wantReq{
-				body: `{"refresh":"a30369f9-7ba1-48c3-bb01efac3lGt]]]]izZ3WE+kUOyrWvsgIQRlEvbI="}`,
-				mode: bodyRaw,
+				cookieBody: "a30369f9-7ba1-48c3-bb01efac3lGt]]]]izZ3WE+kUOyrWvsgIQRlEvbI=",
+				mode:       bodyRaw,
+				hasCookie:  true,
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
@@ -79,10 +73,11 @@ func Test_refreshHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "#04_INVALID_FORMAT",
+			name: "#03_INVALID_FORMAT",
 			req: wantReq{
-				body: `{"refresh":"a30369f9-7ba.1-48c3-bb01efac.3lGta9e8YBV8.Q/s7vVpizZ3WE+kU.OyrWvsgIQRlEvbI="}`,
-				mode: bodyRaw,
+				cookieBody: "a30369f9-7ba.1-48c3-bb01efac.3lGta9e8YBV8.Q/s7vVpizZ3WE+kU.OyrWvsgIQRlEvbI=",
+				mode:       bodyRaw,
+				hasCookie:  true,
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
@@ -90,10 +85,11 @@ func Test_refreshHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "#05_INVALID_PRIVATE",
+			name: "#04_INVALID_PRIVATE",
 			req: wantReq{
-				body: `{"refresh":"18f11757-c9cf-47f4-a187-ddfda409abb4.JZO-pIBdarnkUWzitwphl3rU5P0xFDPHEo4"}`,
-				mode: bodyRaw,
+				cookieBody: "18f11757-c9cf-47f4-a187-ddfda409abb4.JZO-pIBdarnkUWzitwphl3rU5P0xFDPHEo4",
+				mode:       bodyRaw,
+				hasCookie:  true,
 			},
 			want: wantResp{
 				code: http.StatusUnauthorized,
@@ -101,10 +97,12 @@ func Test_refreshHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "#06_REVOKED",
+			name: "#05_REVOKED",
 			req: wantReq{
-				body: `{"refresh":"8c0e3c78-c172-4b5c-b2fe-cc0cd2d795a4.lKTh7FUoTpNSkWm477scWKwhnf4CGRosWNX3YcjEH-o"}`,
-				mode: bodyRaw,
+				cookieBody:      "8c0e3c78-c172-4b5c-b2fe-cc0cd2d795a4.lKTh7FUoTpNSkWm477scWKwhnf4CGRosWNX3YcjEH-o",
+				cookieExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 30),
+				mode:            bodyRaw,
+				hasCookie:       true,
 			},
 			want: wantResp{
 				code: http.StatusUnauthorized,
@@ -112,10 +110,23 @@ func Test_refreshHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "#07_EXPIRED",
+			name: "#06_EXPIRED",
 			req: wantReq{
-				body: `{"refresh":"00f30850-3ceb-4daf-bd84-33d67e56b775.SdbVTVauiZLbe5JKDbiIMF-qeDvtD4b6F55rj0aMKrk"}`,
-				mode: bodyRaw,
+				cookieBody:      "00f30850-3ceb-4daf-bd84-33d67e56b775.SdbVTVauiZLbe5JKDbiIMF-qeDvtD4b6F55rj0aMKrk",
+				cookieExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 2),
+				mode:            bodyRaw,
+				hasCookie:       true,
+			},
+			want: wantResp{
+				code: http.StatusUnauthorized,
+				body: `{"error":"unauthorized"}`,
+			},
+		},
+		{
+			name: "#07_NO_COOKIE",
+			req: wantReq{
+				mode:      bodyRaw,
+				hasCookie: false,
 			},
 			want: wantResp{
 				code: http.StatusUnauthorized,
@@ -125,13 +136,17 @@ func Test_refreshHandler(t *testing.T) {
 		{
 			name: "#08_CHECK_REVOKE",
 			req: wantReq{
-				body: `{"refresh":"0049dd76-af66-490d-ac5a-d1d2ac8dfb0d.mZYBwwU-fpi-r9L1zPkXf69A-yz2ar1yy-6Pwilhksw"}`,
-				mode: bodyRaw,
+				cookieBody:      "0049dd76-af66-490d-ac5a-d1d2ac8dfb0d.mZYBwwU-fpi-r9L1zPkXf69A-yz2ar1yy-6Pwilhksw",
+				cookieExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 19),
+				mode:            bodyRaw,
+				hasCookie:       true,
 			},
 			check: func(t *testing.T, sut http.Handler, body string) {
 				method := http.MethodPost
 				hndURL := "/auth/refresh"
-				req := httptest.NewRequest(method, hndURL, strings.NewReader(body))
+				req := httptest.NewRequest(method, hndURL, nil)
+				req.AddCookie(makeCookie("0049dd76-af66-490d-ac5a-d1d2ac8dfb0d.mZYBwwU-fpi-r9L1zPkXf69A-yz2ar1yy-6Pwilhksw",
+					time.Now().UTC().Add(time.Hour*24*19)))
 				rr := httptest.NewRecorder()
 				sut.ServeHTTP(rr, req)
 				assert.Equal(t, http.StatusUnauthorized, rr.Code)
@@ -151,26 +166,30 @@ func Test_refreshHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(method, hndURL, strings.NewReader(tt.req.body))
+			req := httptest.NewRequest(method, hndURL, nil)
+			if tt.req.hasCookie {
+				req.AddCookie(makeCookie(tt.req.cookieBody, tt.req.cookieExpiresAt))
+			}
+
 			rr := httptest.NewRecorder()
 			sut.ServeHTTP(rr, req)
 
-			body := parseBody(t, rr.Body, tt.req.mode)
+			body := parseResponse(t, rr, tt.req.mode)
 			if tt.check == nil {
 				assert.Equal(t, tt.want.code, rr.Code)
 				assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body),
 					testutil.NormalizeJSON(t, body))
 			} else {
-				tt.check(t, sut, tt.req.body)
+				tt.check(t, sut, tt.req.cookieBody)
 			}
 		})
 	}
 }
 
-func parseBody(t *testing.T, body *bytes.Buffer, mode authBodyMode) string {
+func parseResponse(t *testing.T, rec *httptest.ResponseRecorder, mode authBodyMode) string {
 	t.Helper()
 
-	raw := body.Bytes()
+	raw := rec.Body.Bytes()
 
 	if mode == bodyRaw {
 		return string(raw)
@@ -188,7 +207,21 @@ func parseBody(t *testing.T, body *bytes.Buffer, mode authBodyMode) string {
 	}
 
 	if mode == bodyAccessAndRefresh {
-		if err := parseRefresh(resp.Refresh); err != nil {
+		var refresh string
+
+		for _, cookie := range rec.Result().Cookies() {
+			if cookie.Name == "refresh_token" {
+				refresh = cookie.Value
+				break
+			}
+		}
+
+		if refresh == "" {
+			t.Log("refresh cookie not found")
+			return string(raw)
+		}
+
+		if err := parseRefresh(refresh); err != nil {
 			t.Logf("check refresh: %v", err)
 			return string(raw)
 		}
@@ -242,4 +275,16 @@ func parseRefresh(refresh string) error {
 	}
 
 	return nil
+}
+
+func makeCookie(value string, expiresAt time.Time) *http.Cookie {
+	return &http.Cookie{
+		Name:     "refresh_token",
+		Value:    value,
+		Path:     "/auth",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  expiresAt,
+	}
 }

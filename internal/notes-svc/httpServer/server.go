@@ -14,6 +14,7 @@ import (
 
 	noteservice "notes/internal/notes-svc/noteService"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -74,9 +75,7 @@ func StartServer(ctx context.Context, port string, service *noteservice.Service)
 				middlewares.DemandJSONHeaders(
 					HTTPListNoteHandler(service)))))
 
-	mux.HandleFunc("/health",
-		middlewares.LogMiddleware(
-			HealthCheckHandler()))
+	mux.HandleFunc("/health", HealthCheckHandler())
 
 	server := &http.Server{
 		Addr:    ":" + port,
@@ -118,6 +117,8 @@ func StartHealthServer(ctx context.Context, port string) error {
 	mux.HandleFunc("/health",
 		middlewares.LogMiddleware(
 			HealthCheckHandler()))
+
+	mux.Handle("/metrics", promhttp.Handler())
 
 	server := &http.Server{
 		Addr:    ":" + port,

@@ -29,12 +29,29 @@ func signInHandler(auth authsvc.IAuthSVC) http.HandlerFunc {
 			RememberMe: dtoUser.RememberMe,
 		}
 
-		resp, err := auth.Login(ctx, loginReq)
+		tokens, err := auth.Login(ctx, loginReq)
 		if err != nil {
 			handleError(w, fmt.Errorf("svc.list: %w", err), logger)
 			return
 		}
 
+		var cookie *http.Cookie
+		if tokens.Refresh != "" {
+			cookie = &http.Cookie{
+				Name:     "refresh_token",
+				Value:    tokens.Refresh,
+				Path:     "/auth",
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteLaxMode,
+				Expires:  tokens.RefreshExpiresAt,
+			}
+		}
+		http.SetCookie(w, cookie)
+
+		resp := AuthResp{
+			Access: tokens.Access,
+		}
 		writeJSON(w, http.StatusOK, logger, resp)
 	}
 }

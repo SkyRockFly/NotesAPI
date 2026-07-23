@@ -29,12 +29,28 @@ func signUpHandler(authSVC authsvc.IAuthSVC) http.HandlerFunc {
 			Email:    dtoUser.Email,
 		}
 
-		resp, err := authSVC.Signup(ctx, req)
+		tokens, err := authSVC.Signup(ctx, req)
 		if err != nil {
 			handleError(w, fmt.Errorf("SignUp: %w", err), logger)
 			return
 		}
+		var cookie *http.Cookie
+		if tokens.Refresh != "" {
+			cookie = &http.Cookie{
+				Name:     "refresh_token",
+				Value:    tokens.Refresh,
+				Path:     "/auth",
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteLaxMode,
+				Expires:  tokens.RefreshExpiresAt,
+			}
+		}
+		http.SetCookie(w, cookie)
 
+		resp := AuthResp{
+			Access: tokens.Access,
+		}
 		writeJSON(w, http.StatusCreated, logger, resp)
 	}
 }

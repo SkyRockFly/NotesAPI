@@ -74,9 +74,7 @@ services:
          interval: 5s
          timeout: 3s
          retries: 10
-      secrets:
-        - source: jwt_secret
-          target: /run/secrets/jwt_secret
+      
 
     gateway:
       build:
@@ -96,6 +94,15 @@ services:
          interval: 5s
          timeout: 3s
          retries: 10
+      secrets:
+        - source: jwt_secret
+          target: /run/secrets/jwt_secret
+    prometheus:
+      image: prom/prometheus
+      volumes:
+        - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      ports:
+        - "9090:9090"
         
 secrets:
   jwt_secret:
