@@ -1,0 +1,78 @@
+name: Tests
+
+on:
+  push:
+    branches: [develop]
+    paths-ignore:
+      - "README.md"
+      - "badges/**"
+      - ".badges/**"
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+
+    services:
+      gateway-pg:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gateway-test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d gateway-test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      notes-pg:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: notes-test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d notes-test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      
+    env:
+      GATEWAY_DB_URL: postgres://postgres:postgres@localhost:5432/gateway-test?sslmode=disable
+      NOTES_DB_URL: postgres://postgres:postgres@localhost:5433/notes-test?sslmode=disable
+      GATEWAY_MIGRATIONS_DIR: ${{ github.workspace }}/migrations/gateway
+      NOTES_MIGRATIONS_DIR: ${{ github.workspace }}/migrations/notes-svc
+
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install goose
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+
+      - name: Run database migrations
+        run: |
+          goose -dir "$GATEWAY_MIGRATIONS_DIR" postgres "$DB_URL" up
+          goose -dir "$NOTES_MIGRATIONS_DIR" postgres "$DB_URL" up
+
+      - run:  go test ./...-coverprofile=coverage.out -covermode=atomic
+
+      - name: check test coverage
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          profile: coverage.out
+          threshold-total: 60
+          git-token: ${{ github.ref_name == 'develop' && secrets.GITHUB_TOKEN || '' }}
+          git-branch: badges 
