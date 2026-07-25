@@ -12,7 +12,6 @@ import (
 	"notes/internal/pkg/interceptors"
 	"notes/internal/pkg/testutil"
 	"os"
-	"strconv"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -67,26 +66,7 @@ func TestMain(m *testing.M) {
 func ConfigureFromENV() (*TestCfg, error) {
 	var cfg TestCfg
 	cfg.DBurl = os.Getenv("NOTES_DB_URL")
-	fixtureAccID := os.Getenv("FIXTURE_ACCOUNT_ID")
 
-	var err error
-	cfg.FixtureAccID, err = strconv.Atoi(fixtureAccID)
-	if err != nil {
-		return &cfg, fmt.Errorf("convert fixture acc ID: %w", err)
-	}
-	if cfg.FixtureAccID < 0 {
-		return &cfg, fmt.Errorf("fixture account id less than zero")
-	}
-
-	fixtureNoteID := os.Getenv("FIXTURE_NOTE_ID")
-	cfg.FixtureNoteID, err = strconv.Atoi(fixtureNoteID)
-	if err != nil {
-		return &cfg, fmt.Errorf("convert fixture acc ID: %w", err)
-	}
-
-	if cfg.FixtureNoteID < 0 {
-		return &cfg, fmt.Errorf("fixture account id less than zero")
-	}
 	return &cfg, nil
 }
 

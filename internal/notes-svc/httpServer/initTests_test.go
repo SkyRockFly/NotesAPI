@@ -7,7 +7,6 @@ import (
 	noteservice "notes/internal/notes-svc/noteService"
 	"notes/internal/pkg/testutil"
 	"os"
-	"strconv"
 	"testing"
 	"time"
 
@@ -46,13 +45,6 @@ func TestMain(m *testing.M) {
 		log.Fatalf("load config: %v", err)
 	}
 
-	log.Printf(
-		"cfg.DBurl=%q NOTES_DB_URL=%q DB_URL=%q",
-		cfg.DBurl,
-		os.Getenv("NOTES_DB_URL"),
-		os.Getenv("DB_URL"),
-	)
-
 	pool, err = testutil.SetupPgxPool(cfg.DBurl)
 	if err != nil {
 		log.Fatalf("pgxPool: %v", err)
@@ -71,26 +63,6 @@ func TestMain(m *testing.M) {
 func ConfigureFromENV() (*TestCfg, error) {
 	var cfg TestCfg
 	cfg.DBurl = os.Getenv("NOTES_DB_URL")
-	fixtureAccID := os.Getenv("FIXTURE_ACCOUNT_ID")
-
-	var err error
-	cfg.FixtureAccID, err = strconv.Atoi(fixtureAccID)
-	if err != nil {
-		return &cfg, fmt.Errorf("convert fixture acc ID: %w", err)
-	}
-	if cfg.FixtureAccID < 0 {
-		return &cfg, fmt.Errorf("fixture account id less than zero")
-	}
-
-	fixtureNoteID := os.Getenv("FIXTURE_NOTE_ID")
-	cfg.FixtureNoteID, err = strconv.Atoi(fixtureNoteID)
-	if err != nil {
-		return &cfg, fmt.Errorf("convert fixture acc ID: %w", err)
-	}
-
-	if cfg.FixtureNoteID < 0 {
-		return &cfg, fmt.Errorf("fixture account id less than zero")
-	}
 	return &cfg, nil
 }
 
