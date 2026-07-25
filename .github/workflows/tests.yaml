@@ -64,8 +64,8 @@ jobs:
 
       - name: Run database migrations
         run: |
-          goose -dir "$GATEWAY_MIGRATIONS_DIR" postgres "$DB_URL" up
-          goose -dir "$NOTES_MIGRATIONS_DIR" postgres "$DB_URL" up
+          goose -dir "$GATEWAY_MIGRATIONS_DIR" postgres "$GATEWAY_DB_URL" up
+          goose -dir "$NOTES_MIGRATIONS_DIR" postgres "$NOTES_DB_URL" up
 
       - run:  go test ./...-coverprofile=coverage.out -covermode=atomic
 
