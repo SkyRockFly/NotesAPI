@@ -13,7 +13,6 @@ import (
 )
 
 func TestHTTPListNoteHandler(t *testing.T) {
-	require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
 	sut := middlewares.LogMiddleware(HTTPListNoteHandler(svc))
 
 	type wantReq struct {
@@ -50,9 +49,9 @@ func TestHTTPListNoteHandler(t *testing.T) {
 			},
 			want: wantResp{
 				code: http.StatusOK,
-				body: `{"cursor_next":1,"cursor_prev":1,"notes":
-[{"id":1,"account_id":101,"title":"get-visible-note","body":"Fixture used by the GET note test.","created_at":"2025-08-12T08:00:00Z",
-"updated_at":"2025-08-12T08:15:00Z"}],"has_more":false}`,
+				body: `{"cursor_next":1,"cursor_prev":1,"notes":[{"id":1,"account_id":101,
+				"title":"get-visible-note","body":"Fixture used by the GET note test.",
+"created_at":"2025-08-12T08:00:00Z","updated_at":"2025-08-12T08:15:00Z"}],"has_more":false}`,
 			},
 		},
 		{
@@ -109,10 +108,11 @@ func TestHTTPListNoteHandler(t *testing.T) {
 		},
 	}
 
-	url := "/note/create"
+	url := "/note/list"
 	method := http.MethodPost
 
 	for _, tt := range tests {
+		require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(method, url, strings.NewReader(tt.req.body))
 			rr := httptest.NewRecorder()

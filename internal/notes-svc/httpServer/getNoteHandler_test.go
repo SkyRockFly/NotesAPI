@@ -12,7 +12,6 @@ import (
 )
 
 func TestHTTPGetNoteHandler(t *testing.T) {
-	require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
 	sut := HTTPGetNoteHandler(svc)
 
 	type wantReq struct {
@@ -82,11 +81,12 @@ func TestHTTPGetNoteHandler(t *testing.T) {
 		},
 	}
 
-	url := "/note/create"
+	url := "/note/get"
 	method := http.MethodPost
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
 			req := httptest.NewRequest(method, url, strings.NewReader(tt.req.body))
 			rr := httptest.NewRecorder()
 

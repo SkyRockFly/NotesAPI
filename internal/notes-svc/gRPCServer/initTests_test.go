@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 
 func ConfigureFromENV() (*TestCfg, error) {
 	var cfg TestCfg
-	cfg.DBurl = os.Getenv("DB_URL")
+	cfg.DBurl = os.Getenv("NOTES_DB_URL")
 	fixtureAccID := os.Getenv("FIXTURE_ACCOUNT_ID")
 
 	var err error

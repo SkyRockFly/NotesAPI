@@ -46,6 +46,13 @@ func TestMain(m *testing.M) {
 		log.Fatalf("load config: %v", err)
 	}
 
+	log.Printf(
+		"cfg.DBurl=%q NOTES_DB_URL=%q DB_URL=%q",
+		cfg.DBurl,
+		os.Getenv("NOTES_DB_URL"),
+		os.Getenv("DB_URL"),
+	)
+
 	pool, err = testutil.SetupPgxPool(cfg.DBurl)
 	if err != nil {
 		log.Fatalf("pgxPool: %v", err)

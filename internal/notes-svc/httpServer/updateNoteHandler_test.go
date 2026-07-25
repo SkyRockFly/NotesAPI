@@ -13,7 +13,6 @@ import (
 )
 
 func TestHTTPUpdateNoteHandler(t *testing.T) {
-	require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
 	sut := middlewares.LogMiddleware(HTTPUpdateNoteHandler(svc))
 
 	type wantReq struct {
@@ -81,11 +80,12 @@ func TestHTTPUpdateNoteHandler(t *testing.T) {
 		},
 	}
 
-	url := "/note/create"
+	url := "/note/update"
 	method := http.MethodPost
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
 			req := httptest.NewRequest(method, url, strings.NewReader(tt.req.body))
 			rr := httptest.NewRecorder()
 

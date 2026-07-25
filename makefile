@@ -14,7 +14,7 @@ NOTES_DB_URL           ?= postgres://$(NOTES_DB_USER):$(NOTES_DB_PASSWORD)@local
 
 NOTES_MIGRATIONS_DIR   ?= ./migrations/notes-svc
 NOTES_FIXTURES_DIR     ?= ./internal/notes-svc/httpServer/testdata/fixtures
-GO_TEST_NOTES_FLAGS    ?= -v ./internal/notes-svc/gRPCServer
+GO_TEST_NOTES_FLAGS    ?= -v ./internal/notes-svc/... --count=1 -p=1
 
 NOTES_FIXTURE_ACCOUNT_ID ?= 101
 NOTES_FIXTURE_NOTE_ID    ?= 1

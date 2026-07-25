@@ -13,7 +13,6 @@ import (
 )
 
 func TestHTTPCreateNoteHandler(t *testing.T) {
-	require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
 	sut := middlewares.LogMiddleware(HTTPCreateNoteHandler(svc))
 
 	type wantReq struct {
@@ -65,7 +64,7 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
-				body: `{"error":"invalid content of fields"}`,
+				body: `{"error":"bad request"}`,
 			},
 		},
 		{
@@ -75,7 +74,7 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 			},
 			want: wantResp{
 				code: http.StatusBadRequest,
-				body: `{"error":"invalid content of fields"}`,
+				body: `{"error":"bad request"}`,
 			},
 		},
 	}
@@ -85,6 +84,7 @@ func TestHTTPCreateNoteHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, testutil.LoadFixtures(pool, fixturePath, resetFixtures))
 			req := httptest.NewRequest(method, url, strings.NewReader(tt.req.body))
 			rr := httptest.NewRecorder()
 
