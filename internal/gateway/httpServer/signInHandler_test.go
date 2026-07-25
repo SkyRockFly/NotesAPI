@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const fixtureSignInHandler = `testdata\fixtures\signin\rows.sql`
+const fixtureSignInHandler = `testdata/fixtures/signin/rows.sql`
 
 func Test_signInHandler(t *testing.T) {
 	type wantReq struct {
