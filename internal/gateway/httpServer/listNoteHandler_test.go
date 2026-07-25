@@ -39,9 +39,9 @@ func Test_listNoteHandler(t *testing.T) {
 			},
 			want: wantResp{
 				code: http.StatusOK,
-				body: `{"cursor_next":2,"cursor_prev":1,"notes":[{"id":1,"account_id":101,"title":"test title","body":"test body",
+				body: `{"cursor_next":2,"cursor_prev":1,"notes":[{"id":1,"title":"test title","body":"test body",
 "created_at":"2026-07-13T20:00:00Z","updated_at":"2026-07-13T20:00:00Z"},
-{"id":2,"account_id":101,"title":"test title","body":"test body","created_at":
+{"id":2,"title":"test title","body":"test body","created_at":
 "2026-07-13T20:00:00Z","updated_at":"2026-07-13T20:00:00Z"}],"has_more":false}`,
 			},
 		},

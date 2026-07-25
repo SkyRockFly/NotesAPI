@@ -37,7 +37,6 @@ type healthResponse struct {
 
 type ResponseNote struct {
 	ID        int       `json:"id"`
-	AccountID int       `json:"account_id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"created_at"`
@@ -45,8 +44,7 @@ type ResponseNote struct {
 }
 
 type AuthResp struct {
-	Access  string `json:"access,omitempty"`
-	Refresh string `json:"refresh,omitempty"`
+	Access string `json:"access,omitempty"`
 }
 
 type ServerOpts struct {
@@ -96,8 +94,6 @@ func StartServer(ctx context.Context, opts ServerOpts) error {
 		refreshHandler(opts.SVCauth),
 		middlewares.LogMiddleware,
 		rlAuth.RateLimitMiddleware,
-		middlewares.DemandJSONHeaders,
-		middlewares.JSONReqSizeMiddleware,
 	))
 
 	rlUID, err := middlewares.NewRateLimiter(ctx, getUIDKey, opts.RateLimiterCfg)
@@ -150,9 +146,12 @@ func StartServer(ctx context.Context, opts ServerOpts) error {
 		middlewares.JSONReqSizeMiddleware,
 	))
 
+	handler := middlewares.CORS(mux,
+		"http://localhost:5682")
+
 	server := &http.Server{
 		Addr:    ":" + strconv.Itoa(opts.Port),
-		Handler: mux,
+		Handler: handler,
 	}
 
 	errs, eCtx := errgroup.WithContext(ctx)
@@ -243,7 +242,6 @@ func decodeJSON(str any, r *http.Request) error {
 func remapSvcToRespNote(note notesvc.Note) ResponseNote {
 	newNote := ResponseNote{
 		ID:        note.ID,
-		AccountID: note.AccountID,
 		Title:     note.Title,
 		Body:      note.Body,
 		CreatedAt: note.CreatedAt,

@@ -20,11 +20,14 @@ import (
 )
 
 const (
-	shortTTL = time.Hour
-	longTTL  = 30 * 24 * time.Hour
-	// if refresh token remaining time to live less than this threshold, generate new one
+	shortTTL      = time.Hour
+	longTTL       = 30 * 24 * time.Hour
+	longThreshold = shortTTL + (longTTL-shortTTL)/2
+	// Rotate a long-lived refresh token when its remaining TTL
+	// is less than or equal to this threshold.
 	rotateThreshold = 20 * 24 * time.Hour
-	jwtTTL          = 10 * time.Minute
+
+	jwtTTL = 10 * time.Minute
 )
 
 type Service struct {
@@ -44,8 +47,9 @@ type refreshKey struct {
 }
 
 type AuthResp struct {
-	Access  string
-	Refresh string
+	Access           string
+	Refresh          string
+	RefreshExpiresAt time.Time
 }
 
 func NewService(r refreshtokenrepo.IToken, secret []byte) *Service {
@@ -84,7 +88,10 @@ func (s *Service) Extend(ctx context.Context, refresh string) (AuthResp, error) 
 		Access: jwt,
 	}
 
-	if time.Until(oldToken.ExpiredAt) <= rotateThreshold {
+	isLong := oldToken.ExpiredAt.Sub(oldToken.IssuedAt) > longThreshold
+	isExpired := time.Until(oldToken.ExpiredAt) <= rotateThreshold
+
+	if isLong && isExpired {
 		key, err := generateRefreshToken()
 		if err != nil {
 			return AuthResp{}, fmt.Errorf("generate refresh: %w", err)
@@ -105,6 +112,7 @@ func (s *Service) Extend(ctx context.Context, refresh string) (AuthResp, error) 
 		}
 
 		resp.Refresh = key.pairKeys()
+		resp.RefreshExpiresAt = time.Now().Add(longTTL)
 	}
 
 	return resp, nil
@@ -141,8 +149,9 @@ func (s *Service) IssueTokens(ctx context.Context, req IssueTokensReq) (AuthResp
 	}
 
 	resp := AuthResp{
-		Access:  jwt,
-		Refresh: key.pairKeys(),
+		Access:           jwt,
+		Refresh:          key.pairKeys(),
+		RefreshExpiresAt: time.Now().Add(ttl),
 	}
 
 	return resp, nil

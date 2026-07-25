@@ -13,10 +13,6 @@ type updateDTO struct {
 	Body  string `json:"body"`
 }
 
-type updateResponse struct {
-	Updated bool `json:"updated"`
-}
-
 func updateNoteHandler(service *notesvc.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

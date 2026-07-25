@@ -39,7 +39,7 @@ func Test_getNoteHandler(t *testing.T) {
 			},
 			want: wantResp{
 				code: http.StatusOK,
-				body: `{"id":1,"account_id":101,"title":"test title","body":"test body",
+				body: `{"id":1,"title":"test title","body":"test body",
 "created_at":"2026-07-13T20:00:00Z","updated_at":"2026-07-13T20:00:00Z"}`,
 			},
 		},

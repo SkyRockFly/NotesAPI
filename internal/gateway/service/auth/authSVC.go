@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"notes/internal/gateway/service/refreshsvc"
 	usersvc "notes/internal/gateway/service/user"
+	"time"
 )
 
 type IAuthSVC interface {
@@ -26,8 +27,9 @@ type SignUpReq struct {
 }
 
 type AuthResp struct {
-	Access  string
-	Refresh string
+	Access           string
+	Refresh          string
+	RefreshExpiresAt time.Time
 }
 
 type Service struct {
@@ -64,8 +66,9 @@ func (s *Service) Login(ctx context.Context, req LoginReq) (AuthResp, error) {
 	}
 
 	resp := AuthResp{
-		Access:  tokens.Access,
-		Refresh: tokens.Refresh,
+		Access:           tokens.Access,
+		Refresh:          tokens.Refresh,
+		RefreshExpiresAt: tokens.RefreshExpiresAt,
 	}
 
 	return resp, nil
@@ -94,8 +97,9 @@ func (s *Service) Signup(ctx context.Context, req SignUpReq) (AuthResp, error) {
 	}
 
 	resp := AuthResp{
-		Access:  tokens.Access,
-		Refresh: tokens.Refresh,
+		Access:           tokens.Access,
+		Refresh:          tokens.Refresh,
+		RefreshExpiresAt: tokens.RefreshExpiresAt,
 	}
 	return resp, nil
 }
@@ -106,8 +110,9 @@ func (s *Service) Refresh(ctx context.Context, refresh string) (AuthResp, error)
 		return AuthResp{}, fmt.Errorf("%w", err)
 	}
 	resp := AuthResp{
-		Access:  tokens.Access,
-		Refresh: tokens.Refresh,
+		Access:           tokens.Access,
+		Refresh:          tokens.Refresh,
+		RefreshExpiresAt: tokens.RefreshExpiresAt,
 	}
 	return resp, nil
 }

@@ -85,7 +85,7 @@ func Test_signInHandler(t *testing.T) {
 			rr := httptest.NewRecorder()
 			sut.ServeHTTP(rr, req)
 
-			body := parseBody(t, rr.Body, tt.req.mode)
+			body := parseResponse(t, rr, tt.req.mode)
 			assert.Equal(t, tt.want.code, rr.Code)
 			assert.Equal(t, testutil.NormalizeJSON(t, tt.want.body),
 				testutil.NormalizeJSON(t, body))

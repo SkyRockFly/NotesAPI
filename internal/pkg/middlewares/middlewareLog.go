@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	requestid "notes/internal/pkg/requestID"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 )
 
@@ -37,6 +40,26 @@ func (r *middlewareResponseWriter) WriteHeader(statusCode int) {
 	r.w.WriteHeader(statusCode)
 }
 
+var (
+	httpRequests = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "gateway",
+			Name:      "http_requests_total",
+			Help:      "Total number of HTTP requests.",
+		},
+		[]string{"method", "route", "status"},
+	)
+
+	httpDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "gateway",
+			Name:      "http_request_duration_seconds",
+			Help:      "HTTP request duration in seconds.",
+		},
+		[]string{"method", "route", "status"},
+	)
+)
+
 func LogMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestID := r.Header.Get("x-request-id")
@@ -61,6 +84,7 @@ func LogMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			Logger()
 
 		subLogger.Info().
+			Str("method", r.Method).
 			Str("route", route).Msg("in")
 
 		ctx = context.WithValue(
@@ -86,5 +110,9 @@ func LogMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			Int("status", sw.statusCode).
 			Int64("time_ms", duration.Milliseconds()).
 			Msg("out")
+
+		statusText := strconv.Itoa(sw.statusCode)
+		httpRequests.WithLabelValues(r.Method, route, statusText).Inc()
+		httpDuration.WithLabelValues(r.Method, route, statusText).Observe(duration.Seconds())
 	}
 }
