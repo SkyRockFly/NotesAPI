@@ -49,7 +49,7 @@ type TestCfg struct {
 
 func ConfigureFromENV() (*TestCfg, error) {
 	var cfg TestCfg
-	cfg.DBurl = os.Getenv("DB_URL")
+	cfg.DBurl = os.Getenv("GATEWAY_DB_URL")
 	return &cfg, nil
 }
 

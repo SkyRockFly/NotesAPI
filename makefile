@@ -65,7 +65,7 @@ notes-migrate:
 
 notes-test: notes-db-up notes-migrate
 	@echo ">>> Running NOTES tests with DB_URL=$(NOTES_DB_URL)"
-	@DB_URL="$(NOTES_DB_URL)" FIXTURE_ACCOUNT_ID=$(NOTES_FIXTURE_ACCOUNT_ID) FIXTURE_NOTE_ID=$(NOTES_FIXTURE_NOTE_ID) \
+	@NOTES_DB_URL="$(NOTES_DB_URL)" FIXTURE_ACCOUNT_ID=$(NOTES_FIXTURE_ACCOUNT_ID) FIXTURE_NOTE_ID=$(NOTES_FIXTURE_NOTE_ID) \
 		go test $(GO_TEST_NOTES_FLAGS)
 	@$(MAKE) notes-db-down
 
@@ -111,7 +111,7 @@ gateway-migrate:
 
 gateway-test: gateway-db-up gateway-migrate
 	@echo ">>> Running GATEWAY tests with DB_URL=$(GATEWAY_DB_URL)"
-	@DB_URL="$(GATEWAY_DB_URL)" go test $(GO_TEST_GATEWAY_FLAGS)
+	@GATEWAY_DB_URL="$(GATEWAY_DB_URL)" go test $(GO_TEST_GATEWAY_FLAGS)
 	@$(MAKE) gateway-db-down
 
 gateway-db-logs:
