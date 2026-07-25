@@ -16,9 +16,6 @@ NOTES_MIGRATIONS_DIR   ?= ./migrations/notes-svc
 NOTES_FIXTURES_DIR     ?= ./internal/notes-svc/httpServer/testdata/fixtures
 GO_TEST_NOTES_FLAGS    ?= -v ./internal/notes-svc/... --count=1 -p=1
 
-NOTES_FIXTURE_ACCOUNT_ID ?= 101
-NOTES_FIXTURE_NOTE_ID    ?= 1
-
 ##### GATEWAY (auth, http gateway) #####
 GATEWAY_DB_IMAGE       ?= postgres:16
 GATEWAY_DB_USER        ?= postgres
@@ -65,7 +62,7 @@ notes-migrate:
 
 notes-test: notes-db-up notes-migrate
 	@echo ">>> Running NOTES tests with DB_URL=$(NOTES_DB_URL)"
-	@NOTES_DB_URL="$(NOTES_DB_URL)" FIXTURE_ACCOUNT_ID=$(NOTES_FIXTURE_ACCOUNT_ID) FIXTURE_NOTE_ID=$(NOTES_FIXTURE_NOTE_ID) \
+	@NOTES_DB_URL="$(NOTES_DB_URL)" \
 		go test $(GO_TEST_NOTES_FLAGS)
 	@$(MAKE) notes-db-down
 
