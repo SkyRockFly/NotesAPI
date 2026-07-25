@@ -30,3 +30,4 @@ go.work.sum
 
 #secret
 /secret
+/secrets/jwt_secret/jwt_secret

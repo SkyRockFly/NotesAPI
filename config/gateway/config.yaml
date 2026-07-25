@@ -11,7 +11,7 @@ logger:
   formatlevel: "%-6s"
   level: "debug"
 auth:
-  jwt_secret_file: "/run/secrets/jwtsecret"
+  jwt_secret_file: "/run/secrets/jwt_secret/jwt_secret"
 rate_limiter:
   requests: 5
   period: 1m
