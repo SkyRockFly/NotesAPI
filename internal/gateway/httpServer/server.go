@@ -16,7 +16,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -38,7 +37,6 @@ type healthResponse struct {
 
 type ResponseNote struct {
 	ID        int       `json:"id"`
-	AccountID int       `json:"account_id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"created_at"`
@@ -46,8 +44,7 @@ type ResponseNote struct {
 }
 
 type AuthResp struct {
-	Access  string `json:"access,omitempty"`
-	Refresh string `json:"refresh,omitempty"`
+	Access string `json:"access,omitempty"`
 }
 
 type ServerOpts struct {
@@ -93,7 +90,7 @@ func StartServer(ctx context.Context, opts ServerOpts) error {
 		middlewares.JSONReqSizeMiddleware,
 	))
 
-	mux.HandleFunc("GET /auth/refresh", Pipe(
+	mux.HandleFunc("POST /auth/refresh", Pipe(
 		refreshHandler(opts.SVCauth),
 		middlewares.LogMiddleware,
 		rlAuth.RateLimitMiddleware,
@@ -149,12 +146,12 @@ func StartServer(ctx context.Context, opts ServerOpts) error {
 		middlewares.JSONReqSizeMiddleware,
 	))
 
-	mux.Handle("/metrics", promhttp.Handler())
-	mux.HandleFunc("GET /health", HealthCheckHandler())
+	handler := middlewares.CORS(mux,
+		"http://localhost:5682")
 
 	server := &http.Server{
 		Addr:    ":" + strconv.Itoa(opts.Port),
-		Handler: mux,
+		Handler: handler,
 	}
 
 	errs, eCtx := errgroup.WithContext(ctx)
@@ -245,7 +242,6 @@ func decodeJSON(str any, r *http.Request) error {
 func remapSvcToRespNote(note notesvc.Note) ResponseNote {
 	newNote := ResponseNote{
 		ID:        note.ID,
-		AccountID: note.AccountID,
 		Title:     note.Title,
 		Body:      note.Body,
 		CreatedAt: note.CreatedAt,

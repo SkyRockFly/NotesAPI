@@ -6,7 +6,7 @@ import (
 	authsvc "notes/internal/gateway/service/auth"
 )
 
-type signInDTO struct {
+type SignInDTO struct {
 	Login      string `json:"login"`
 	Password   string `json:"password"`
 	RememberMe bool   `json:"remember_me"`
@@ -17,7 +17,7 @@ func signInHandler(auth authsvc.IAuthSVC) http.HandlerFunc {
 		ctx := r.Context()
 		logger := getCtxLogger(ctx)
 
-		var dtoUser signInDTO
+		var dtoUser SignInDTO
 		if err := decodeJSON(&dtoUser, r); err != nil {
 			handleError(w, fmt.Errorf("decode: %w", err), logger)
 			return
@@ -36,6 +36,7 @@ func signInHandler(auth authsvc.IAuthSVC) http.HandlerFunc {
 		}
 
 		var cookie *http.Cookie
+		fmt.Println(tokens)
 		if tokens.Refresh != "" {
 			cookie = &http.Cookie{
 				Name:     "refresh_token",

@@ -6,7 +6,7 @@ import (
 	authsvc "notes/internal/gateway/service/auth"
 )
 
-type signUpDTO struct {
+type SignUpDTO struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
 	Email    string `json:"email"`
@@ -17,7 +17,7 @@ func signUpHandler(authSVC authsvc.IAuthSVC) http.HandlerFunc {
 		ctx := r.Context()
 		logger := getCtxLogger(ctx)
 
-		var dtoUser signUpDTO
+		var dtoUser SignUpDTO
 		if err := decodeJSON(&dtoUser, r); err != nil {
 			handleError(w, fmt.Errorf("decode: %w", err), logger)
 			return

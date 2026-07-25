@@ -252,19 +252,6 @@ func checkAccess(access string) error {
 	return nil
 }
 
-func chechRefresh(raw []byte) error {
-	var resp AuthResp
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		return fmt.Errorf("unmarshal: %w", err)
-	}
-
-	if err := parseRefresh(resp.Refresh); err != nil {
-		return fmt.Errorf("parseRefresh: %w", err)
-	}
-
-	return nil
-}
-
 func parseRefresh(refresh string) error {
 	parts := strings.Split(refresh, ".")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {

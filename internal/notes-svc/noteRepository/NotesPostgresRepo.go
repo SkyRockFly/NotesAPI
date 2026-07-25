@@ -26,8 +26,8 @@ WHERE id = $1 AND account_id = $2;`
 	sqlList = `SELECT id, account_id, title, body, created_at, updated_at FROM note
 WHERE account_id = $1;`
 	sqlUpdate = `UPDATE note
-SET title = $1, body = $2
-WHERE ID = $3 AND account_id = $4;`
+SET title = $1, body = $2, updated_at = NOW() AT TIME ZONE 'UTC'
+WHERE ID = $3 AND account_id = $4 AND deleted_at IS NULL;`
 )
 
 type PostgresImpl struct {

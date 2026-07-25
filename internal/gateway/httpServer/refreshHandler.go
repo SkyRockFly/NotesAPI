@@ -28,10 +28,10 @@ func refreshHandler(svctoken authsvc.IAuthSVC) http.HandlerFunc {
 			Access: tokens.Access,
 		}
 		var cookie *http.Cookie
-		if resp.Refresh != "" {
+		if tokens.Refresh != "" {
 			cookie = &http.Cookie{
 				Name:     "refresh_token",
-				Value:    resp.Refresh,
+				Value:    tokens.Refresh,
 				Path:     "/auth",
 				HttpOnly: true,
 				Secure:   true,
