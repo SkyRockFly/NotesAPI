@@ -46,7 +46,7 @@ type LoggerConfig struct {
 
 type AuthConfig struct {
 	JWTSecretFile string `yaml:"jwt_secret_file" validate:"required"`
-	JWTSecret     []byte
+	JWTSecret     []byte `yaml:"-"`
 }
 
 type RateLimiterConfig struct {
@@ -147,6 +147,10 @@ func GetAppConfig() (*AppConfig, error) {
 		return nil, fmt.Errorf("validate struct: %w", err)
 	}
 
+	if err := GetSecretKey(&config.Auth); err != nil {
+		return nil, fmt.Errorf("get key: %w", err)
+	}
+
 	return config, nil
 }
 
@@ -157,7 +161,7 @@ func GetSecretKey(auth *AuthConfig) error {
 	}
 	key := bytes.TrimSpace(b)
 	if len(key) < 32 {
-		return fmt.Errorf("weak secret key")
+		return fmt.Errorf("weak secret key, must be at least 32 bytes")
 	}
 	auth.JWTSecret = key
 	return nil

@@ -36,7 +36,6 @@ func signInHandler(auth authsvc.IAuthSVC) http.HandlerFunc {
 		}
 
 		var cookie *http.Cookie
-		fmt.Println(tokens)
 		if tokens.Refresh != "" {
 			cookie = &http.Cookie{
 				Name:     "refresh_token",
