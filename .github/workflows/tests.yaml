@@ -67,10 +67,12 @@ jobs:
           goose -dir "$GATEWAY_MIGRATIONS_DIR" postgres "$GATEWAY_DB_URL" up
           goose -dir "$NOTES_MIGRATIONS_DIR" postgres "$NOTES_DB_URL" up
 
-      - run:  go test -p=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+      - run:  go test ./... -p=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out 
 
       - name: check test coverage
         uses: vladopajic/go-test-coverage@v2
         with:
+          config: ./.testcoverage.yml
+          profile: coverage.out
           git-token: ${{ github.ref_name == 'develop' && secrets.GITHUB_TOKEN || '' }}
           git-branch: badges 
