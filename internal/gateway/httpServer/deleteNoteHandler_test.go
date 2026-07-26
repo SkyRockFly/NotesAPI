@@ -19,7 +19,7 @@ import (
 func Test_deleteNoteHandler(t *testing.T) {
 	type wantReq struct {
 		body  string
-		ctxID int
+		ctxID any
 	}
 	type wantResp struct {
 		code int
@@ -95,6 +95,17 @@ func Test_deleteNoteHandler(t *testing.T) {
 			want: wantResp{
 				code: http.StatusBadRequest,
 				body: `{"error":"bad request"}`,
+			},
+		},
+		{
+			name: "#06_INVALID_UID",
+			req: wantReq{
+				body:  `{"id":1}`,
+				ctxID: "lmao",
+			},
+			want: wantResp{
+				code: http.StatusInternalServerError,
+				body: `{"error":"service error"}`,
 			},
 		},
 	}

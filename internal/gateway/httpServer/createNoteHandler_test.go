@@ -19,7 +19,7 @@ import (
 func Test_createNoteHandler(t *testing.T) {
 	type wantReq struct {
 		body  string
-		ctxID int
+		ctxID any
 	}
 	type wantResp struct {
 		code int
@@ -86,7 +86,18 @@ func Test_createNoteHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "#06_NOT_FOUND",
+			name: "#06_INVALID_UID",
+			req: wantReq{
+				body:  `{"title":"title","body":"body"}`,
+				ctxID: "lmao",
+			},
+			want: wantResp{
+				code: http.StatusInternalServerError,
+				body: `{"error":"service error"}`,
+			},
+		},
+		{
+			name: "#07_NOT_FOUND",
 			req: wantReq{
 				body:  `{"title":"test title","body":"test body"}`,
 				ctxID: 102,

@@ -1,0 +1,8 @@
+profile: coverage.out
+
+threshold:
+  total: 60
+
+exclude:
+  paths:
+    - '(^|/)mocks?(/|$)'
