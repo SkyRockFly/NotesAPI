@@ -96,7 +96,7 @@ func Test_listNoteHandler(t *testing.T) {
 				ctxID: "lmao",
 			},
 			want: wantResp{
-				code: http.StatusBadRequest,
+				code: http.StatusUnprocessableEntity,
 				body: `{"error":"invalid json"}`,
 			},
 		},
