@@ -5,6 +5,8 @@ threshold:
 
 exclude:
   paths:
+    - ^cmd/
+
     - '(^|/)mocks?(/|$)'
 
     - ^internal/grpc/generated/

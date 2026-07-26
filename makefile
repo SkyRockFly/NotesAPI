@@ -14,7 +14,7 @@ NOTES_DB_URL           ?= postgres://$(NOTES_DB_USER):$(NOTES_DB_PASSWORD)@local
 
 NOTES_MIGRATIONS_DIR   ?= ./migrations/notes-svc
 NOTES_FIXTURES_DIR     ?= ./internal/notes-svc/httpServer/testdata/fixtures
-GO_TEST_NOTES_FLAGS    ?= -v ./internal/notes-svc/... --count=1 -p=1
+GO_TEST_NOTES_FLAGS    ?= ./internal/notes-svc/... -p=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out \ 
 
 ##### GATEWAY (auth, http gateway) #####
 GATEWAY_DB_IMAGE       ?= postgres:16
@@ -28,7 +28,8 @@ GATEWAY_DB_URL         ?= postgres://$(GATEWAY_DB_USER):$(GATEWAY_DB_PASSWORD)@l
 
 GATEWAY_MIGRATIONS_DIR ?= ./migrations/gateway
 GATEWAY_FIXTURES_DIR   ?= ./test/fixtures
-GO_TEST_GATEWAY_FLAGS  ?= -v ./internal/gateway/httpServer -count=1 -failfast
+GO_TEST_GATEWAY_FLAGS  ?= ./internal/gateway/... -p=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out  
+
 
 ##### PHONY #####
 .PHONY: test-all \

@@ -72,7 +72,5 @@ jobs:
       - name: check test coverage
         uses: vladopajic/go-test-coverage@v2
         with:
-          profile: coverage.out
-          threshold-total: 60
           git-token: ${{ github.ref_name == 'develop' && secrets.GITHUB_TOKEN || '' }}
           git-branch: badges 
