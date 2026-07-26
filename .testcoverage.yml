@@ -6,3 +6,7 @@ threshold:
 exclude:
   paths:
     - '(^|/)mocks?(/|$)'
+
+    - ^internal/grpc/generated/
+
+    - ^internal/pkg/testutil/
