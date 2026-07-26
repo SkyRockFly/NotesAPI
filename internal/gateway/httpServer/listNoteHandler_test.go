@@ -85,12 +85,12 @@ func Test_listNoteHandler(t *testing.T) {
 				ctxID: "lmao",
 			},
 			want: wantResp{
-				code: http.StatusNotFound,
-				body: `{"error":"not found"}`,
+				code: http.StatusInternalServerError,
+				body: `{"error":"service error"}`,
 			},
 		},
 		{
-			name: "#06_BAD_JSON",
+			name: "#05_BAD_JSON",
 			req: wantReq{
 				body:  `{"cursor":0,"limit":10,"ne`,
 				ctxID: "lmao",

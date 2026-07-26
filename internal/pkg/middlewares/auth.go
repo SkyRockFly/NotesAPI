@@ -34,8 +34,10 @@ func Auth(secret []byte, leeway time.Duration) func(http.HandlerFunc) http.Handl
 
 			parts := strings.SplitN(auth, " ", 2)
 			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-				logger.Info().Err(fmt.Errorf("bad auth header: %s", auth)).Msg("auth middleware")
-				http.Error(w, `"error":"invalid auth header"`, http.StatusBadRequest)
+				logger.Error().Err(fmt.Errorf("cannot parse bearer")).Msg("auth mw")
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"invalid auth header"}`))
 				return
 			}
 
@@ -45,15 +47,19 @@ func Auth(secret []byte, leeway time.Duration) func(http.HandlerFunc) http.Handl
 			if _, err := parser.ParseWithClaims(rawKey, &claims, func(*jwt.Token) (any, error) {
 				return secret, nil
 			}); err != nil {
-				logger.Error().Err(fmt.Errorf("parse jwt: %w", err)).Msg("auth middleware")
-				http.Error(w, `"error":"unauthorized"`, http.StatusUnauthorized)
+				logger.Error().Err(fmt.Errorf("parse jwt: %w", err)).Msg("auth mw")
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
 				return
 			}
 
 			uid, err := strconv.Atoi(claims.Subject)
 			if err != nil {
-				logger.Error().Err(fmt.Errorf("convert uid: %w", err)).Msg("auth middleware")
-				http.Error(w, `"error":"service error"`, http.StatusInternalServerError)
+				logger.Error().Err(fmt.Errorf("string convert: %w", err)).Msg("auth mw")
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":"service error"}`))
 				return
 			}
 			idCtx := context.WithValue(ctx, UIDKey, uid)
