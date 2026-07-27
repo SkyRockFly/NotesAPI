@@ -13,6 +13,7 @@ import (
 type IAuthSVC interface {
 	Login(ctx context.Context, req LoginReq) (AuthResp, error)
 	Logout(ctx context.Context, req LogoutReq) error
+	DeleteUser(ctx context.Context, req DeleteUserReq) error
 	Signup(ctx context.Context, req SignUpReq) (AuthResp, error)
 	Refresh(ctx context.Context, refresh string) (AuthResp, error)
 	LogoutAll(ctx context.Context, req LogoutAllReq) error
@@ -42,6 +43,10 @@ type LogoutReq struct {
 
 type LogoutAllReq struct {
 	UserID int
+}
+
+type DeleteUserReq struct {
+	ID int
 }
 
 type Service struct {
@@ -152,6 +157,30 @@ func (s *Service) LogoutAll(ctx context.Context, req LogoutAllReq) error {
 			return nil
 		}
 		return fmt.Errorf("logout: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) DeleteUser(ctx context.Context, req DeleteUserReq) error {
+	tokenReq := refreshsvc.RevokeAllReq{
+		UserID: req.ID,
+	}
+	if err := s.tokenSVC.RevokeAll(ctx, tokenReq); err != nil {
+		if !errors.Is(err, apperror.ErrNotFound) {
+			return fmt.Errorf("revoke all: %w", err)
+		}
+	}
+
+	svcReq := usersvc.DeleteUserReq{
+		ID: req.ID,
+	}
+
+	if err := s.userSVC.Delete(ctx, svcReq); err != nil {
+		if errors.Is(err, apperror.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("delete user: %w", err)
 	}
 
 	return nil

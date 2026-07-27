@@ -17,7 +17,8 @@ const (
 	sqlCreate = `INSERT INTO app_user (login, password, email) 
 VALUES ($1, $2, $3)
 RETURNING id;`
-	sqlDelete     = `UPDATE FROM app_user SET deleted_at = now() AT TIME UTC WHERE id = $1 AND deleted_at IS NULL;`
+	sqlDelete = `UPDATE app_user SET deleted_at = NOW() AT TIME ZONE 'UTC' 
+WHERE id = $1 AND deleted_at IS NULL;`
 	sqlGetByLogin = `SELECT id, login, password, email FROM app_user
 WHERE login = $1 AND deleted_at IS NULL;`
 

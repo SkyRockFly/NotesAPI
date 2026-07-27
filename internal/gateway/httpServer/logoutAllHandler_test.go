@@ -33,7 +33,7 @@ func TestLogoutAllHandler(t *testing.T) {
 		{
 			name: "#01_OK",
 			req: testReq{
-				uid: 42,
+				uid: 1,
 			},
 			want: wantResp{
 				code:          http.StatusNoContent,
@@ -100,10 +100,9 @@ func TestLogoutAllHandler(t *testing.T) {
 				tt.want.cookieDeleted,
 				refreshCookieDeleted(rec),
 			)
-			if tt.want.isRevoked {
-				uid, ok := tt.req.uid.(int)
-				require.True(t, ok)
-				assert.True(t, checkUserRefreshRevoke(t, uid))
+			uid, ok := tt.req.uid.(int)
+			if ok {
+				assert.Equal(t, tt.want.isRevoked, checkUserRefreshRevoke(t, uid))
 			}
 		})
 	}
@@ -113,12 +112,18 @@ func checkUserRefreshRevoke(t *testing.T, uid int) bool {
 	t.Helper()
 
 	const query = `
-		SELECT NOT EXISTS (
-			SELECT 1
-			FROM refresh_token
-			WHERE user_id = $1
-			  AND revoked IS NOT TRUE
-		)`
+		SELECT
+			EXISTS (
+				SELECT 1
+				FROM refresh_token
+				WHERE user_id = $1
+			)
+			AND NOT EXISTS (
+				SELECT 1
+				FROM refresh_token
+				WHERE user_id = $1
+				  AND revoked IS NOT TRUE
+			)`
 	var revoked bool
 	err := pool.QueryRow(
 		context.Background(),

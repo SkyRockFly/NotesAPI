@@ -65,6 +65,17 @@ func TestLogoutHandler(t *testing.T) {
 				isRevoked:     false,
 			},
 		},
+		{
+			name: "#04_BAD_REFRESH",
+			req: wantReq{
+				refresh: "selectordsdsd",
+			},
+			want: wantResp{
+				code:          http.StatusBadRequest,
+				cookieDeleted: false,
+				isRevoked:     false,
+			},
+		},
 	}
 
 	handler := logoutHandler(svcAuth)

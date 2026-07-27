@@ -19,8 +19,9 @@ VALUES ($1, $2, $3,
 SET revoked = true WHERE user_id = $1;`
 	sqlRevoke = `UPDATE refresh_token
 SET revoked = true WHERE selector = $1;`
-	sqlGet = `SELECT selector,private_hash,user_id,issued_at,expired_at,revoked FROM refresh_token
-WHERE selector = $1;`
+	sqlGet = `SELECT rt.selector,rt.private_hash,rt.user_id,rt.issued_at,rt.expired_at,rt.revoked FROM refresh_token rt
+JOIN app_user au ON rt.user_id = au.id
+WHERE rt.selector = $1 AND au.deleted_at IS NULL;`
 )
 
 type Repository struct {
