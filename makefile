@@ -14,7 +14,6 @@ NOTES_DB_URL           ?= postgres://$(NOTES_DB_USER):$(NOTES_DB_PASSWORD)@local
 
 NOTES_MIGRATIONS_DIR   ?= ./migrations/notes-svc
 NOTES_FIXTURES_DIR     ?= ./internal/notes-svc/httpServer/testdata/fixtures
-GO_TEST_NOTES_FLAGS    ?= ./internal/notes-svc/... -p=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out \ 
 
 ##### GATEWAY (auth, http gateway) #####
 GATEWAY_DB_IMAGE       ?= postgres:16
@@ -28,11 +27,11 @@ GATEWAY_DB_URL         ?= postgres://$(GATEWAY_DB_USER):$(GATEWAY_DB_PASSWORD)@l
 
 GATEWAY_MIGRATIONS_DIR ?= ./migrations/gateway
 GATEWAY_FIXTURES_DIR   ?= ./test/fixtures
-GO_TEST_GATEWAY_FLAGS  ?= ./internal/gateway/... -p=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out  
+GO_TEST_FLAGS  ?= ./... -p=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out  
 
 
 ##### PHONY #####
-.PHONY: test-all \
+.PHONY: test \
         notes-db-up notes-db-wait notes-migrate notes-test notes-db-logs notes-psql notes-url notes-db-down notes-db-clean \
         gateway-db-up gateway-db-wait gateway-migrate gateway-test gateway-db-logs gateway-psql gateway-url gateway-db-down gateway-db-clean
 
@@ -127,7 +126,8 @@ gateway-db-down:
 
 gateway-db-clean: gateway-db-down
 
-##### ALL #####
-test-all:
-	@$(MAKE) notes-test
-	@$(MAKE) gateway-test
+test: notes-db-up notes-migrate gateway-db-up gateway-migrate
+	@trap '$(MAKE) gateway-db-down; $(MAKE) notes-db-down' 0; \
+	GATEWAY_DB_URL="$(GATEWAY_DB_URL)" \
+	NOTES_DB_URL="$(NOTES_DB_URL)" \
+	go test $(GO_TEST_FLAGS)

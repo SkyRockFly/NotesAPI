@@ -117,14 +117,6 @@ func handleGRPCError(err error, log *zerolog.Logger) error {
 		code = codes.NotFound
 		msg = "not found"
 
-	case errors.Is(err, apperror.ErrAlreadyExists):
-		code = codes.AlreadyExists
-		msg = "already exists"
-
-	case errors.Is(err, apperror.ErrUnauthorized):
-		code = codes.Unauthenticated
-		msg = "unauthorized"
-
 	case errors.Is(err, apperror.ErrBackend):
 		level = zerolog.ErrorLevel
 		code = codes.Unavailable

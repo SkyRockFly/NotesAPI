@@ -2,16 +2,20 @@ package authsvc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"notes/internal/gateway/service/refreshsvc"
 	usersvc "notes/internal/gateway/service/user"
+	"notes/internal/pkg/apperror"
 	"time"
 )
 
 type IAuthSVC interface {
 	Login(ctx context.Context, req LoginReq) (AuthResp, error)
+	Logout(ctx context.Context, req LogoutReq) error
 	Signup(ctx context.Context, req SignUpReq) (AuthResp, error)
 	Refresh(ctx context.Context, refresh string) (AuthResp, error)
+	LogoutAll(ctx context.Context, req LogoutAllReq) error
 }
 
 type LoginReq struct {
@@ -30,6 +34,14 @@ type AuthResp struct {
 	Access           string
 	Refresh          string
 	RefreshExpiresAt time.Time
+}
+
+type LogoutReq struct {
+	Refresh string
+}
+
+type LogoutAllReq struct {
+	UserID int
 }
 
 type Service struct {
@@ -115,4 +127,32 @@ func (s *Service) Refresh(ctx context.Context, refresh string) (AuthResp, error)
 		RefreshExpiresAt: tokens.RefreshExpiresAt,
 	}
 	return resp, nil
+}
+
+func (s *Service) Logout(ctx context.Context, req LogoutReq) error {
+	svcReq := refreshsvc.RevokeTokenReq{
+		Refresh: req.Refresh,
+	}
+	if err := s.tokenSVC.RevokeToken(ctx, svcReq); err != nil {
+		if errors.Is(err, apperror.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("logout: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) LogoutAll(ctx context.Context, req LogoutAllReq) error {
+	svcReq := refreshsvc.RevokeAllReq{
+		UserID: req.UserID,
+	}
+	if err := s.tokenSVC.RevokeAll(ctx, svcReq); err != nil {
+		if errors.Is(err, apperror.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("logout: %w", err)
+	}
+
+	return nil
 }

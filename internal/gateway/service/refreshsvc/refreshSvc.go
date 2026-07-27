@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	refreshtokenrepo "notes/internal/gateway/repository/refreshToken"
 	"notes/internal/pkg/apperror"
@@ -37,8 +38,16 @@ type Service struct {
 }
 
 type IssueTokensReq struct {
-	UserID     int `validate:"required,gte=1"`
+	UserID     int `validate:"min=1"`
 	RememberMe bool
+}
+
+type RevokeTokenReq struct {
+	Refresh string
+}
+
+type RevokeAllReq struct {
+	UserID int `validate:"min=1"`
 }
 
 type refreshKey struct {
@@ -68,6 +77,9 @@ func (s *Service) Extend(ctx context.Context, refresh string) (AuthResp, error) 
 
 	oldToken, err := s.repo.Get(ctx, oldSelector)
 	if err != nil {
+		if errors.Is(err, apperror.ErrNotFound) {
+			return AuthResp{}, fmt.Errorf("get token: %w", apperror.ErrUnauthorized)
+		}
 		return AuthResp{}, fmt.Errorf("get token: %w", err)
 	}
 
@@ -155,6 +167,31 @@ func (s *Service) IssueTokens(ctx context.Context, req IssueTokensReq) (AuthResp
 	}
 
 	return resp, nil
+}
+
+func (s *Service) RevokeAll(ctx context.Context, req RevokeAllReq) error {
+	if err := kit.ValidateStruct(s.validate, req); err != nil {
+		return fmt.Errorf("%w: validate request struct: %w", apperror.ErrBadRequest, err)
+	}
+
+	if err := s.repo.RevokeAll(ctx, req.UserID); err != nil {
+		return fmt.Errorf("revokeAll: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) RevokeToken(ctx context.Context, req RevokeTokenReq) error {
+	oldSelector, _, err := parseRefresh(req.Refresh)
+	if err != nil {
+		return fmt.Errorf("parse refresh: %w", err)
+	}
+
+	if err := s.repo.Revoke(ctx, oldSelector); err != nil {
+		return fmt.Errorf("revoke: %w", err)
+	}
+
+	return nil
 }
 
 func generateRefreshToken() (refreshKey, error) {

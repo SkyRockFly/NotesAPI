@@ -93,7 +93,7 @@ func Test_listNoteHandler(t *testing.T) {
 			name: "#05_BAD_JSON",
 			req: wantReq{
 				body:  `{"cursor":0,"limit":10,"ne`,
-				ctxID: "lmao",
+				ctxID: 101,
 			},
 			want: wantResp{
 				code: http.StatusUnprocessableEntity,

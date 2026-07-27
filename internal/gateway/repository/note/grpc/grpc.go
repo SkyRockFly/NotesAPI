@@ -171,15 +171,6 @@ func mapGRPCError(code codes.Code) error {
 	case codes.NotFound:
 		return apperror.ErrNotFound
 
-	case codes.AlreadyExists:
-		return apperror.ErrAlreadyExists
-
-	case codes.Unauthenticated:
-		return apperror.ErrUnauthorized
-
-	case codes.Unavailable:
-		return apperror.ErrBackend
-
 	default:
 		return apperror.ErrBackend
 	}

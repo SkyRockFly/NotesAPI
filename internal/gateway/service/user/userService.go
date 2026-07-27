@@ -39,6 +39,10 @@ type GetUserReq struct {
 	Password string `validate:"required,min=8,max=71"`
 }
 
+type DeleteUserReq struct {
+	ID int `validate:"min=1"`
+}
+
 func NewService(r userrepo.IUser) *Service {
 	return &Service{
 		repo:     r,
@@ -73,12 +77,12 @@ func (s *Service) Create(ctx context.Context, req CreateUserReq) (int, error) {
 	return id, nil
 }
 
-func (s *Service) Delete(ctx context.Context, id int) error {
-	if id < 1 {
-		return fmt.Errorf("%w: id less than one", apperror.ErrBadRequest)
+func (s *Service) Delete(ctx context.Context, req DeleteUserReq) error {
+	if err := kit.ValidateStruct(s.validate, req); err != nil {
+		return fmt.Errorf("validate req: %w", apperror.ErrBadRequest)
 	}
 
-	if err := s.repo.Delete(ctx, id); err != nil {
+	if err := s.repo.Delete(ctx, req.ID); err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
 

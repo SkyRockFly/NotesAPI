@@ -157,15 +157,28 @@ func Test_refreshHandler(t *testing.T) {
 				body: `{"error":"unauthorized"}`,
 			},
 		},
+		{
+			name: "#09_NOT_EXIST",
+			req: wantReq{
+				cookieBody:      "0049dd76-af66-490d-ac1a-d1d2ac8dfp0d.mZYBwwU-fpi-r9L1zPkXf69A-yz2ar1yy-6Pwilhksw",
+				cookieExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 2),
+				mode:            bodyRaw,
+				hasCookie:       true,
+			},
+			want: wantResp{
+				code: http.StatusUnauthorized,
+				body: `{"error":"unauthorized"}`,
+			},
+		},
 	}
 
-	require.NoError(t, testutil.LoadFixtures(pool, fixtureRefreshHandler, resetALLFixtures))
 	sut := refreshHandler(svcAuth)
 	method := http.MethodPost
 	hndURL := "/auth/refresh"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, testutil.LoadFixtures(pool, fixtureRefreshHandler, resetALLFixtures))
 			req := httptest.NewRequest(method, hndURL, nil)
 			if tt.req.hasCookie {
 				req.AddCookie(makeCookie(tt.req.cookieBody, tt.req.cookieExpiresAt))

@@ -121,6 +121,58 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Logout User
+      operationId: logout
+
+      security:
+        - refreshCookie: []
+
+      responses:
+        "204":
+          description: Refresh token revoked
+          headers:
+            Set-Cookie:
+              description: Deletes old refresh cookie
+              schema:
+                type: string
+                example: refresh_token=""; Path=/auth; HttpOnly, Age=-1
+
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+
+  /auth/logoutAll:
+    post:
+      tags:
+        - Auth
+      summary: Logout User
+      operationId: logout
+
+      responses:
+        "204":
+          description: All refresh tokens revoked
+          headers:
+            Set-Cookie:
+              description: Deletes old refresh cookie
+              schema:
+                type: string
+                example: refresh_token=""; Path=/auth; HttpOnly, Age=-1
+
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
 
   /note/create:
     post:

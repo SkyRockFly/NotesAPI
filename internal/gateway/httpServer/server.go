@@ -96,6 +96,18 @@ func StartServer(ctx context.Context, opts ServerOpts) error {
 		rlAuth.RateLimitMiddleware,
 	))
 
+	mux.HandleFunc("POST /auth/logout", Pipe(
+		logoutHandler(opts.SVCauth),
+		middlewares.LogMiddleware,
+		rlAuth.RateLimitMiddleware,
+	))
+
+	mux.HandleFunc("POST /auth/logoutAll", Pipe(
+		logoutAllHandler(opts.SVCauth),
+		middlewares.LogMiddleware,
+		rlAuth.RateLimitMiddleware,
+	))
+
 	rlUID, err := middlewares.NewRateLimiter(ctx, getUIDKey, opts.RateLimiterCfg)
 	if err != nil {
 		return fmt.Errorf("init rate limiter UID: %w", err)
