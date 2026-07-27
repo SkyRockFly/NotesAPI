@@ -1,6 +1,8 @@
 ## Notes Service
 
 [![coverage](https://raw.githubusercontent.com/SkyRockFly/NotesAPI/badges/.badges/develop/coverage.svg)](https://github.com/SkyRockFly/NotesAPI/actions/workflows/tests.yaml)
+
+
 A backend application for user authentication and note management, built with Go, gRPC, PostgreSQL, and Docker.
 
 The project consists of an HTTP Gateway and a separate NotesService communicating over gRPC.
