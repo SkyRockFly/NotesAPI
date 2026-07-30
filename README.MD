@@ -50,6 +50,11 @@ flowchart LR
 
 ## Launch
 
+Download repository:
+
+```bash
+git clone https://github.com/SkyRockFly/NotesService
+```
 
 Create a local JWT secret file from the provided example:
 
