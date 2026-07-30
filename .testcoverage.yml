@@ -1,0 +1,14 @@
+profile: coverage.out
+
+threshold:
+  total: 60
+
+exclude:
+  paths:
+    - ^cmd/
+
+    - '(^|/)mocks?(/|$)'
+
+    - ^internal/grpc/generated/
+
+    - ^internal/pkg/testutil/

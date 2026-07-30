@@ -1,0 +1,20 @@
+server:
+  port: 5680
+db:
+  url: "postgres://postgres:bear@db-gateway:5432/gatewaydb"
+notes-svc:
+  is_grpc: true
+  port: 5681
+  host: "notes"
+logger:
+  timestamp: "2006-01-02 15:04:05"
+  formatlevel: "%-6s"
+  level: "debug"
+auth:
+  jwt_secret_file: "/run/secrets/jwt_secret/jwt_secret"
+rate_limiter:
+  requests: 5
+  period: 1m
+  burst: 5
+  visitor_ttl: 24h
+  cleanup_interval: 1h

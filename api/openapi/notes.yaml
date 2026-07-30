@@ -1,0 +1,616 @@
+openapi: 3.0.4
+
+info:
+  title: Notes API
+  version: 1.0.0
+  description: HTTP API for authentication and note management.
+
+servers:
+  - url: http://localhost:5680
+    description: Local Gateway
+
+tags:
+  - name: Auth
+    description: Authentication and session management
+
+  - name: Notes
+    description: Note operations
+
+paths:
+  /auth/signin:
+    post:
+      tags:
+        - Auth
+      summary: Sign In
+      operationId: signin
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInReq"
+
+      responses:
+        "200":
+          description: Authentication successful
+          headers:
+            Set-Cookie:
+              description: Refresh token cookie
+              schema:
+                type: string
+                example: refresh_token=<opaque-token>; Path=/auth; HttpOnly
+
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResp"
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/signup:
+    post:
+      tags:
+        - Auth
+      summary: Create User
+      operationId: signup
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignUpReq"
+
+      responses:
+        "201":
+          description: User Created Successfully
+          headers:
+            Set-Cookie:
+              description: Refresh token cookie
+              schema:
+                type: string
+                example: refresh_token=<opaque-token>; Path=/auth; HttpOnly
+
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResp"
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+        "409":
+          $ref: "#/components/fresponses/AlreadyExists"
+
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Refresh access token
+      operationId: refreshToken
+
+      security:
+        - refreshCookie: []
+
+      responses:
+        "200":
+          description: Access Token Granted
+          headers:
+            Set-Cookie:
+              description: Present only when the refresh token is rotated
+              schema:
+                type: string
+                example: refresh_token=<opaque-token>; Path=/auth; HttpOnly
+
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResp"
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Logout User
+      operationId: logout
+
+      security:
+        - refreshCookie: []
+
+      responses:
+        "204":
+          description: Refresh token revoked
+          headers:
+            Set-Cookie:
+              description: Deletes old refresh cookie
+              schema:
+                type: string
+                example: refresh_token=""; Path=/auth; HttpOnly, Age=-1
+
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+
+  /auth/logoutAll:
+    post:
+      tags:
+        - Auth
+      summary: Logout User
+      operationId: logout
+
+      responses:
+        "204":
+          description: All refresh tokens revoked
+          headers:
+            Set-Cookie:
+              description: Deletes old refresh cookie
+              schema:
+                type: string
+                example: refresh_token=""; Path=/auth; HttpOnly, Age=-1
+
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+
+  /note/create:
+    post:
+      tags:
+        - Notes
+      summary: Create a note
+      operationId: createNote
+
+      security:
+        - bearerAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoteReq"
+
+      responses:
+        "201":
+          description: Note created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateNoteResp"
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  
+  /note/get:
+    post:
+      tags:
+        - Notes
+      summary: Get Note
+      operationId: getNote
+
+      security:
+        - bearerAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetNoteReq"
+
+      responses:
+        "200":
+          description: Note found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  
+  /note/delete:
+      post:
+        tags:
+          - Notes
+        summary: Delete Note
+        operationId: deleteNote
+
+        security:
+          - bearerAuth: []
+
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteNoteReq"
+
+        responses:
+          "204":
+            description: Note deleted
+
+          "400":
+            $ref: "#/components/responses/BadRequest"
+
+          "401":
+            $ref: "#/components/responses/Unauthorized"
+
+          "404":
+            $ref: "#/components/responses/NotFound"
+
+  /note/list:
+      post:
+        tags:
+          - Notes
+        summary: List notes
+        operationId: ListNotes
+
+        security:
+          - bearerAuth: []
+
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListNoteReq"
+
+        responses:
+          "200":
+            description: Notes found
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ListNoteResp"
+
+          "400":
+            $ref: "#/components/responses/BadRequest"
+
+          "401":
+            $ref: "#/components/responses/Unauthorized"
+
+          "404":
+            $ref: "#/components/responses/NotFound"
+
+  /note/update:
+      post:
+        tags:
+          - Notes
+        summary: Update Note
+        operationId: updateNote
+
+        security:
+          - bearerAuth: []
+
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateNoteReq"
+
+        responses:
+          "204":
+            description: Note updated succesfully
+
+          "400":
+            $ref: "#/components/responses/BadRequest"
+
+          "401":
+            $ref: "#/components/responses/Unauthorized"
+
+          "404":
+            $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+
+  schemas:
+    SignInReq:
+      type: object
+      required:
+        - login
+        - password
+
+      properties:
+        login:
+          type: string
+          example: user
+
+        password:
+          type: string
+          format: password
+          example: secret-password
+
+        remember_me:
+          type: boolean
+          default: false
+      
+    SignUpReq:
+      type: object
+      required:
+        - login
+        - password
+        - email
+
+      properties:
+        login:
+          type: string
+          example: user
+
+        password:
+          type: string
+          format: password
+          example: secret-password
+
+        email:
+          type: string
+          format: email
+          example: user@gmail.com
+
+    AuthResp:
+      type: object
+      required:
+        - access
+
+      properties:
+        access:
+          type: string
+          description: Access JWT
+
+    CreateNoteReq:
+      type: object
+      required:
+        - title
+        - body
+
+      properties:
+        title:
+          type: string
+          example: Shopping list
+
+        body:
+          type: string
+          example: Milk, meat 
+
+    CreateNoteResp:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+          format: int32
+          example: 3
+
+    GetNoteReq:
+      type: object
+      required:
+        - id
+
+      properties:
+        id:
+          type: integer
+          format: int32
+          example: 2
+      
+    DeleteNoteReq:
+      type: object
+      required:
+        - id
+
+      properties:
+        id:
+          type: integer
+          format: int32
+          example: 2
+
+    ListNoteReq:
+      type: object
+      required:
+        - limit
+        - cursor
+        - next
+
+      properties:
+        limit:
+          type: integer
+          format: int32
+          example: 10
+
+        cursor:
+          type: integer
+          format: int32
+          example: 0
+
+        next:
+          type: boolean
+          example: true
+
+    ListNoteResp:
+      type: object
+      required:
+        - cursor_next
+        - cursor_prev
+        - notes
+        - has_more
+
+      properties:
+        cursor_next:
+          type: integer
+          format: int32
+          example: 10
+
+        cursor_prev:
+          type: integer
+          format: int32
+          example: 1
+
+        notes:
+          type: array
+          items: 
+            $ref: "#/components/schemas/Note"
+          
+        has_more:
+          type: boolean
+          example: true
+
+    UpdateNoteReq:
+      type: object
+      required:
+        - id
+        - title
+        - body
+
+      properties:
+        id:
+          type: integer
+          format: int32
+          example: 2
+
+        title:
+          type: string
+          example: Updated title
+
+        body:
+          type: string
+          example: Updated body
+
+    Note:
+      type: object
+      required:
+        - id
+        - title
+        - body
+        - created_at
+        - updated_at
+
+      properties:
+        id:
+          type: integer
+          format: int32
+          example: 42
+
+        title:
+          type: string
+          example: Shopping list
+
+        body:
+          type: string
+          example: Milk, meat
+
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-07-25T08:30:00Z"
+
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-07-25T10:30:00Z"
+
+    ErrorBadRequest:
+      type: object
+      required:
+        - error
+
+      properties:
+        error:
+          type: string
+          example: bad request
+
+    ErrorUnauthorized:
+      type: object
+      required:
+        - error
+
+      properties:
+        error:
+          type: string
+          example: unauthorized
+
+    ErrorNotFound:
+      type: object
+      required:
+        - error
+
+      properties:
+        error:
+          type: string
+          example: not found
+
+    ErrorAlreadyExists:
+      type: object
+      required:
+        - error
+
+      properties:
+        error:
+          type: string
+          example: already exists
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBadRequest"
+
+    Unauthorized:
+      description: Authentication required or credentials are invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorUnauthorized"
+
+    NotFound:
+      description: Object was not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorNotFound"
+
+    AlreadyExists:
+      description: Object already exists/created
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorAlreadyExists"

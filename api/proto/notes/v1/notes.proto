@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package notes.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "notes/internal/grpc/generated;notesv1";
+
+message Note {
+    int32 id = 1;
+    int32 account_id = 2;
+    string title = 3;
+    string body = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+    google.protobuf.Timestamp deleted_at = 7;
+}
+
+message CreateNoteReq {
+    string title = 1;
+    string body = 2;
+    int32 account_id = 3;
+}
+
+message CreateNoteResp{
+    int32 id = 1;
+}
+
+message DeleteNoteReq{
+    int32 id = 1;
+    int32 account_id = 2;
+}
+
+message DeleteNoteResp{}
+
+message UpdateNoteReq{
+    int32 id = 1;
+    int32 account_id = 2;
+    string title = 3;
+    string body = 4;
+}
+
+message UpdateNoteResp{}
+
+message GetNoteReq{
+    int32 id = 1;
+    int32 account_id = 2;
+}
+
+message GetNoteResp{
+    int32 id = 1;
+    int32 account_id = 2;
+    string title = 3;
+    string body = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+}
+
+message ListNoteReq{
+    int32 account_id = 1;
+    int32 limit = 2;
+    int32 cursor = 3;
+    bool next =4 ;
+}
+
+message ListNoteResp{
+    int32 cursor_next = 1;
+    int32 cursor_prev = 2;
+    repeated Note notes = 3;
+    bool has_more = 4;
+}
+
+service NotesService {
+  rpc DeleteNote(DeleteNoteReq) returns (DeleteNoteResp);
+  rpc CreateNote(CreateNoteReq) returns (CreateNoteResp);
+  rpc GetNote(GetNoteReq) returns (GetNoteResp);
+  rpc ListNote(ListNoteReq) returns (ListNoteResp);
+  rpc UpdateNote(UpdateNoteReq) returns (UpdateNoteResp);
+}
